@@ -1,0 +1,10 @@
+version: "3.4"
+
+services:
+  db:
+    image: reindexer/reindexer
+    restart: always
+    ports:
+      - "6534:6534"
+      - "9088:9088"
+    container_name: ScheduleDb

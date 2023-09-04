@@ -1,0 +1,9 @@
+db:
+  user: "user"
+  pass: "pass"
+  host: "localhost"
+  port: "6534"
+  dbName: "ScheduleDb"
+
+bot:
+  token: "6055714135:AAHJdRC6t6XWH1k-JI2ufXMlBHkL-9Q8L58"

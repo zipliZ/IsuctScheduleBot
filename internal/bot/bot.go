@@ -44,7 +44,7 @@ func (b *ScheduleBot) Listen() {
 			case reGroup.MatchString(message):
 				if b.checkGroupExist(message) {
 					b.db.UpdateUser(update.Message.Chat.ID, message)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Группа установленна")
 					msg.ReplyMarkup = b.buttons
 				} else {
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Такой группы не существует")
@@ -53,48 +53,48 @@ func (b *ScheduleBot) Listen() {
 				msgText := b.getScheduleOnDate(update.Message.Chat.ID, message)
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 			default:
-				switch message {
+				switch strings.ToLower(message) {
 				case "/start":
 					b.db.CreateUser(update.Message.Chat.ID)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-				case "Смена Группы":
+				case "смена группы":
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 
-				case "Сегодня":
+				case "сегодня":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 0)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 
-				case "Завтра":
+				case "завтра":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				case "Понедельник", "Пн":
+				case "понедельник", "пн":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				case "Вторник", "Вт":
+				case "вторник", "вт":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 2)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				case "Среда", "Ср":
+				case "среда", "ср":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 3)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				case "Четверг", "Чт":
+				case "четверг", "чт":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 4)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				case "Пятница", "Пт":
+				case "пятница", "пт":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 5)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				case "Суббота", "Сб":
+				case "суббота", "сб":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 6)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 				default:
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command")
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы ввели неправильные данные или неизвестную команду")
 				}
 			}
 		}
 
 		if _, err := b.bot.Send(msg); err != nil {
-			log.Panic(err)
+			log.Println(err)
 		}
 	}
 }
@@ -112,7 +112,7 @@ func (b *ScheduleBot) checkGroupExist(group string) bool {
 
 	payloadJSON, marshErr := json.Marshal(payload)
 	if marshErr != nil {
-		panic(marshErr)
+		log.Println(marshErr)
 	}
 
 	if _, err := http.Post(url, "application/json", bytes.NewBuffer(payloadJSON)); err != nil {
@@ -139,12 +139,13 @@ func (b *ScheduleBot) getDaySchedule(chatId int64, offset int) string {
 
 		payloadJSON, marshErr := json.Marshal(payload)
 		if marshErr != nil {
-			panic(marshErr)
+			log.Println(marshErr)
+			return ""
 		}
 
 		req, err := http.NewRequest("POST", "http://188.120.234.21/today/api", bytes.NewBuffer(payloadJSON))
 		if err != nil {
-			fmt.Println("Ошибка при создании запроса:", err)
+			log.Println(err)
 			return ""
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -157,18 +158,19 @@ func (b *ScheduleBot) getDaySchedule(chatId int64, offset int) string {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Println("Ошибка при выполнении запроса:", err)
+			log.Println(err)
 			return ""
 		}
 		defer resp.Body.Close()
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			fmt.Println("Ошибка чтения ответа:", err)
+			log.Println(err)
 			return ""
 		}
 		var result GetScheduleResponse
 		if err := json.Unmarshal(body, &result); err != nil {
+			log.Println(err)
 			return ""
 		}
 		return b.formMessage(result)

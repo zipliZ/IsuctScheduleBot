@@ -41,12 +41,7 @@ func (b *BotRepo) CreateUser(chatId int64, username string) {
 }
 
 func (b *BotRepo) UpdateUser(chatId int64, newGroup string) {
-	if _, err := b.db.Update("users", &User{
-		ChatId: chatId,
-		Group:  newGroup,
-	}); err != nil {
-		log.Println(err)
-	}
+	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Group", newGroup).Update()
 }
 
 func (b *BotRepo) GetGroup(chatId int64) string {

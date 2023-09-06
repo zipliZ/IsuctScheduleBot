@@ -4,6 +4,7 @@ import (
 	"ScheduleBot/configs"
 	"github.com/restream/reindexer/v3"
 	_ "github.com/restream/reindexer/v3/bindings/cproto"
+	"log"
 )
 
 type Repo interface {
@@ -30,11 +31,12 @@ func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 	return &BotRepo{db: database}
 }
 
-func (b *BotRepo) CreateUser(chatId int64) {
+func (b *BotRepo) CreateUser(chatId int64, username string) {
 	if _, err := b.db.Insert("users", &User{
-		ChatId: chatId,
+		ChatId:   chatId,
+		Username: username,
 	}); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 
@@ -43,7 +45,7 @@ func (b *BotRepo) UpdateUser(chatId int64, newGroup string) {
 		ChatId: chatId,
 		Group:  newGroup,
 	}); err != nil {
-		panic(err)
+		log.Println(err)
 	}
 }
 

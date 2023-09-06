@@ -62,10 +62,9 @@ func (b *ScheduleBot) Listen() {
 				switch strings.ToLower(message) {
 
 				case "/start":
-					b.db.CreateUser(update.Message.Chat.ID)
+					b.db.CreateUser(update.Message.Chat.ID, update.Message.Chat.UserName)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-
 				case "смена группы":
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)

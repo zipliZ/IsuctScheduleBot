@@ -41,6 +41,10 @@ func (b *ScheduleBot) Listen() {
 			reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
 
 			switch {
+
+			case message != "/start" && b.db.UserExists(update.Message.Chat.ID) == false:
+				msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы не авторизированы, нужно прописать или нажать на /start")
+
 			case reGroup.MatchString(message):
 				if b.checkGroupExist(message) {
 					b.db.UpdateUser(update.Message.Chat.ID, message)
@@ -49,15 +53,19 @@ func (b *ScheduleBot) Listen() {
 				} else {
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Такой группы не существует")
 				}
+
 			case reDate.MatchString(message):
 				msgText := b.getScheduleOnDate(update.Message.Chat.ID, message)
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 			default:
 				switch strings.ToLower(message) {
+
 				case "/start":
 					b.db.CreateUser(update.Message.Chat.ID)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+
 				case "смена группы":
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
@@ -69,24 +77,31 @@ func (b *ScheduleBot) Listen() {
 				case "завтра":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				case "понедельник", "пн":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				case "вторник", "вт":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 2)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				case "среда", "ср":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 3)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				case "четверг", "чт":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 4)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				case "пятница", "пт":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 5)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				case "суббота", "сб":
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, 6)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
 				default:
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы ввели неправильные данные или неизвестную команду")
 				}

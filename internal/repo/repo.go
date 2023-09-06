@@ -10,6 +10,7 @@ type Repo interface {
 	CreateUser(chatId int64, group string)
 	UpdateUser(chatId int64, newGroup string)
 	GetGroup(chatId int64) string
+	UserExists(chatId int64) bool
 }
 
 type BotRepo struct {
@@ -51,5 +52,9 @@ func (b *BotRepo) GetGroup(chatId int64) string {
 		return result.(*User).Group
 	}
 	return ""
+}
 
+func (b *BotRepo) UserExists(chatId int64) bool {
+	_, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
+	return found
 }

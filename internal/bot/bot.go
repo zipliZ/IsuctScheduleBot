@@ -31,15 +31,17 @@ func (b *ScheduleBot) Listen() {
 	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message != nil {
+		var msg tgbotapi.MessageConfig
 
-			var msg tgbotapi.MessageConfig
+		if update.Message != nil {
 
 			message := update.Message.Text
 
 			reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
 			reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
-			if reGroup.MatchString(message) {
+
+			switch {
+			case reGroup.MatchString(message):
 				if b.checkGroupExist(message) {
 					b.db.UpdateUser(update.Message.Chat.ID, message)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
@@ -47,10 +49,10 @@ func (b *ScheduleBot) Listen() {
 				} else {
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Такой группы не существует")
 				}
-			} else if reDate.MatchString(message) {
+			case reDate.MatchString(message):
 				msgText := b.getScheduleOnDate(update.Message.Chat.ID, message)
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-			} else {
+			default:
 				switch message {
 				case "/start":
 					b.db.CreateUser(update.Message.Chat.ID)
@@ -67,14 +69,32 @@ func (b *ScheduleBot) Listen() {
 				case "Завтра":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
+				case "Понедельник", "Пн":
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, 1)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				case "Вторник", "Вт":
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, 2)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				case "Среда", "Ср":
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, 3)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				case "Четверг", "Чт":
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, 4)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				case "Пятница", "Пт":
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, 5)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				case "Суббота", "Сб":
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, 6)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 				default:
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command")
 				}
 			}
-			if _, err := b.bot.Send(msg); err != nil {
-				log.Panic(err)
-			}
+		}
+
+		if _, err := b.bot.Send(msg); err != nil {
+			log.Panic(err)
 		}
 	}
 }
@@ -100,6 +120,12 @@ func (b *ScheduleBot) checkGroupExist(group string) bool {
 	} else {
 		return true
 	}
+}
+func (b *ScheduleBot) getWeekSchedule(chatId int64, dayOfWeekReq int) string {
+	currentDay := time.Now()
+	weekNumber := int(currentDay.Weekday())
+	diff := dayOfWeekReq - weekNumber
+	return b.getDaySchedule(chatId, diff)
 }
 
 func (b *ScheduleBot) getDaySchedule(chatId int64, offset int) string {

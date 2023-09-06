@@ -8,3 +8,12 @@ services:
       - "6534:6534"
       - "9088:9088"
     container_name: ScheduleDb
+  isuctschedulebot:
+    depends_on:
+      - db
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    container_name: ScheduleBot
+

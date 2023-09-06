@@ -1,7 +1,7 @@
 db:
   user: "user"
   pass: "pass"
-  host: "localhost"
+  host: "db"
   port: "6534"
   dbName: "ScheduleDb"
 

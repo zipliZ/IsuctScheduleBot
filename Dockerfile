@@ -16,6 +16,4 @@ COPY --from=build-stage /app /app
 
 COPY --from=build-stage /SheduleBot/config.yaml .
 
-RUN chmod +x /app
-
 ENTRYPOINT ["/app"]

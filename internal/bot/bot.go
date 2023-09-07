@@ -66,6 +66,10 @@ func (b *ScheduleBot) Listen() {
 
 				switch {
 
+				case message == "/help":
+					helpText := formHelpMessage()
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
+
 				case message == "/start":
 					b.db.CreateUser(update.Message.Chat.ID, update.Message.Chat.UserName)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
@@ -236,6 +240,19 @@ func getWeekdayName(weekday int) string {
 		return weekdays[0]
 	}
 	return weekdays[weekday]
+}
+
+func formHelpMessage() string {
+	text := `
+Фукции бота:
+• Выдавать расписание по кнопкам
+• Выдавать расписание по дате:
+    сообщение формата "08.01.2002" или "01.10.02"
+• Выдавать расписание по дню недели:
+    сообщение формата "Понедельник" или "Пн"
+• Быстро менять группу:
+    сообщение типа "4-185"`
+	return text
 }
 
 func checkWeekDay(message string, weakDay *int) bool {

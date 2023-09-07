@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 func NewScheduleBot(token string, db *repo.BotRepo) *ScheduleBot {
@@ -112,14 +113,14 @@ func (b *ScheduleBot) Listen() {
 
 				case update.Message.IsCommand() && update.Message.Command() == "notify_all" && update.Message.Chat.UserName == "zipliZ":
 					msgText := strings.Split(message, "/notify_all ")[1]
-
-					for _, user := range b.db.GetUsers() {
-						msg = tgbotapi.NewMessage(user, msgText)
-						if _, err := b.bot.Send(msg); err != nil {
-							log.Println(err)
+					if msgText != "" {
+						for _, user := range b.db.GetUsers() {
+							msg = tgbotapi.NewMessage(user, msgText)
+							if _, err := b.bot.Send(msg); err != nil {
+								log.Println(err)
+							}
 						}
 					}
-
 					continue
 				default:
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы ввели неправильные данные или неизвестную команду")
@@ -166,7 +167,13 @@ func (b *ScheduleBot) checkGroupExist(group string) bool {
 	}
 }
 func (b *ScheduleBot) getWeekSchedule(chatId int64, dayOfWeekReq int) string {
-	currentDay := time.Now()
+	location, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		log.Println("Ошибка при установке часового пояса:", err)
+		return ""
+	}
+	currentDay := time.Now().In(location)
+
 	weekNumber := int(currentDay.Weekday())
 	var diff int
 	if dayOfWeekReq-weekNumber >= 0 {

@@ -49,6 +49,7 @@ func (b *ScheduleBot) Listen() {
 				if b.checkGroupExist(message) {
 					b.db.UpdateUser(update.Message.Chat.ID, message)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Группа установленна")
+					b.buttons.Keyboard[0][2].Text = fmt.Sprintf("Сменить (%s)", message)
 					msg.ReplyMarkup = b.buttons
 				} else {
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Такой группы не существует")
@@ -59,48 +60,31 @@ func (b *ScheduleBot) Listen() {
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 
 			default:
-				switch strings.ToLower(message) {
 
-				case "/start":
+				var weakDay int
+				message = strings.ToLower(message)
+
+				switch {
+
+				case message == "/start":
 					b.db.CreateUser(update.Message.Chat.ID, update.Message.Chat.UserName)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-				case "смена группы":
+				case message == "смена группы", strings.Contains(message, "сменить"):
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Введите номер группы в форме \"4-185\"")
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 
-				case "сегодня":
+				case message == "сегодня":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 0)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 
-				case "завтра":
+				case message == "завтра":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 
-				case "понедельник", "пн":
-					msgText := b.getWeekSchedule(update.Message.Chat.ID, 1)
+				case checkWeekDay(message, &weakDay):
+					msgText := b.getWeekSchedule(update.Message.Chat.ID, weakDay)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
-				case "вторник", "вт":
-					msgText := b.getWeekSchedule(update.Message.Chat.ID, 2)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
-				case "среда", "ср":
-					msgText := b.getWeekSchedule(update.Message.Chat.ID, 3)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
-				case "четверг", "чт":
-					msgText := b.getWeekSchedule(update.Message.Chat.ID, 4)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
-				case "пятница", "пт":
-					msgText := b.getWeekSchedule(update.Message.Chat.ID, 5)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
-				case "суббота", "сб":
-					msgText := b.getWeekSchedule(update.Message.Chat.ID, 6)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-
 				default:
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы ввели неправильные данные или неизвестную команду")
 				}
@@ -138,7 +122,13 @@ func (b *ScheduleBot) checkGroupExist(group string) bool {
 func (b *ScheduleBot) getWeekSchedule(chatId int64, dayOfWeekReq int) string {
 	currentDay := time.Now()
 	weekNumber := int(currentDay.Weekday())
-	diff := dayOfWeekReq - weekNumber
+	var diff int
+	if dayOfWeekReq-weekNumber >= 0 {
+		diff = dayOfWeekReq - weekNumber
+	} else {
+		diff = dayOfWeekReq - weekNumber + 7
+	}
+
 	return b.getDaySchedule(chatId, diff)
 }
 
@@ -220,7 +210,7 @@ func (b *ScheduleBot) formMessage(schedule GetScheduleResponse) string {
 	dateString := fmt.Sprintf("Расписание на %s, %s неделя \n\n", getWeekdayName(schedule.Weekday), getWeekName(schedule.Week))
 
 	for _, subject := range schedule.Subjects {
-		timeString := fmt.Sprintf("%s-%s |%s\n", subject.Time.Start, subject.Time.End, subject.Type)
+		timeString := fmt.Sprintf("%s-%s |%s\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Type)
 		audienceString := subject.Audience[0].Name
 		var teacherString string
 		for _, teacher := range subject.Teachers {
@@ -246,4 +236,24 @@ func getWeekdayName(weekday int) string {
 		return weekdays[0]
 	}
 	return weekdays[weekday]
+}
+
+func checkWeekDay(message string, weakDay *int) bool {
+	switch message {
+	case "понедельник", "пн":
+		*weakDay = 1
+	case "вторник", "вт":
+		*weakDay = 2
+	case "среда", "ср":
+		*weakDay = 3
+	case "четверг", "чт":
+		*weakDay = 4
+	case "пятница", "пт":
+		*weakDay = 5
+	case "суббота", "сб":
+		*weakDay = 6
+	default:
+		return false
+	}
+	return true
 }

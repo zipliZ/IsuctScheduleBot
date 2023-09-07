@@ -12,6 +12,7 @@ type Repo interface {
 	UpdateUser(chatId int64, newGroup string)
 	GetGroup(chatId int64) string
 	UserExists(chatId int64) bool
+	GetUsers(chatId int64)
 }
 
 type BotRepo struct {
@@ -36,7 +37,7 @@ func (b *BotRepo) CreateUser(chatId int64, username string) {
 		ChatId:   chatId,
 		Username: username,
 	}); err != nil {
-		log.Panic(err)
+		log.Println(err)
 	}
 }
 
@@ -54,4 +55,14 @@ func (b *BotRepo) GetGroup(chatId int64) string {
 func (b *BotRepo) UserExists(chatId int64) bool {
 	_, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
 	return found
+}
+
+func (b *BotRepo) GetUsers() []int64 {
+	iterator := b.db.Query("users").Exec()
+	defer iterator.Close()
+	var users []int64
+	for iterator.Next() {
+		users = append(users, iterator.Object().(*User).ChatId)
+	}
+	return users
 }

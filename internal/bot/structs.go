@@ -6,9 +6,14 @@ import (
 )
 
 type ScheduleBot struct {
-	buttons tgbotapi.ReplyKeyboardMarkup
 	bot     *tgbotapi.BotAPI
 	db      *repo.BotRepo
+	buttons buttons
+}
+
+type buttons struct {
+	standard tgbotapi.ReplyKeyboardMarkup
+	inline   tgbotapi.InlineKeyboardMarkup
 }
 
 type GroupExistRequest struct {

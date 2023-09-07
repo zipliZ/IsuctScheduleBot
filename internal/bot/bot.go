@@ -16,12 +16,28 @@ import (
 
 func NewScheduleBot(token string, db *repo.BotRepo) *ScheduleBot {
 	bot, _ := tgbotapi.NewBotAPI(token)
-	return &ScheduleBot{buttons: tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Сегодня"),
-			tgbotapi.NewKeyboardButton("Завтра"),
-			tgbotapi.NewKeyboardButton("Смена Группы"),
-		)), bot: bot, db: db}
+	return &ScheduleBot{buttons: buttons{
+		standard: tgbotapi.NewReplyKeyboard(
+			tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton("Сегодня"),
+				tgbotapi.NewKeyboardButton("Завтра"),
+				tgbotapi.NewKeyboardButton("День недели"),
+				tgbotapi.NewKeyboardButton("Смена Группы"),
+			),
+		),
+		inline: tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("Пн", "Понедельник"),
+				tgbotapi.NewInlineKeyboardButtonData("Вт", "Вторник"),
+				tgbotapi.NewInlineKeyboardButtonData("Ср", "Среда"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("Чт", "Четверг"),
+				tgbotapi.NewInlineKeyboardButtonData("Пт", "Пятница"),
+				tgbotapi.NewInlineKeyboardButtonData("Сб", "Суббота"),
+			),
+		),
+	}, bot: bot, db: db}
 }
 
 func (b *ScheduleBot) Listen() {
@@ -49,8 +65,8 @@ func (b *ScheduleBot) Listen() {
 				if b.checkGroupExist(message) {
 					b.db.UpdateUser(update.Message.Chat.ID, message)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Группа установленна")
-					b.buttons.Keyboard[0][2].Text = fmt.Sprintf("Сменить (%s)", message)
-					msg.ReplyMarkup = b.buttons
+					b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", message)
+					msg.ReplyMarkup = b.buttons.standard
 				} else {
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Такой группы не существует")
 				}
@@ -86,12 +102,38 @@ func (b *ScheduleBot) Listen() {
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 
+				case message == "день недели":
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите день недели")
+					msg.ReplyMarkup = b.buttons.inline
+
 				case checkWeekDay(message, &weakDay):
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, weakDay)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+
+				case update.Message.IsCommand() && update.Message.Command() == "notify_all" && update.Message.Chat.UserName == "zipliZ":
+					msgText := strings.Split(message, "/notify_all ")[1]
+
+					for _, user := range b.db.GetUsers() {
+						msg = tgbotapi.NewMessage(user, msgText)
+						if _, err := b.bot.Send(msg); err != nil {
+							log.Println(err)
+						}
+					}
+
+					continue
 				default:
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы ввели неправильные данные или неизвестную команду")
 				}
+			}
+		} else if update.CallbackQuery != nil {
+			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
+			if _, err := b.bot.Request(callback); err != nil {
+				log.Println(err)
+			}
+			var weakDay int
+			if checkWeekDay(strings.ToLower(update.CallbackQuery.Data), &weakDay) {
+				msgText := b.getWeekSchedule(update.CallbackQuery.Message.Chat.ID, weakDay)
+				msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, msgText)
 			}
 		}
 

@@ -308,6 +308,8 @@ func escapeSpecialChars(input string) string {
 		"-", "\\-",
 		"|", "\\|",
 		".", "\\.",
+		"(", "\\(",
+		")", "\\)",
 	)
 	return replacer.Replace(input)
 }

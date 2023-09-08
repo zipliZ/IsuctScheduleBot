@@ -75,6 +75,7 @@ func (b *ScheduleBot) Listen() {
 			case reDate.MatchString(message):
 				msgText := b.getScheduleOnDate(update.Message.Chat.ID, message)
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+				msg.ParseMode = "MarkdownV2"
 
 			default:
 
@@ -98,10 +99,12 @@ func (b *ScheduleBot) Listen() {
 				case message == "сегодня":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 0)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+					msg.ParseMode = "MarkdownV2"
 
 				case message == "завтра":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+					msg.ParseMode = "MarkdownV2"
 
 				case message == "день недели":
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите день недели")
@@ -110,6 +113,7 @@ func (b *ScheduleBot) Listen() {
 				case checkWeekDay(message, &weakDay):
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, weakDay)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+					msg.ParseMode = "MarkdownV2"
 
 				case update.Message.IsCommand() && update.Message.Command() == "notify_all" && update.Message.Chat.UserName == "zipliZ":
 					msgText := strings.Split(message, "/notify_all ")[1]
@@ -135,9 +139,10 @@ func (b *ScheduleBot) Listen() {
 			if checkWeekDay(strings.ToLower(update.CallbackQuery.Data), &weakDay) {
 				msgText := b.getWeekSchedule(update.CallbackQuery.Message.Chat.ID, weakDay)
 				msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, msgText)
+				msg.ParseMode = "MarkdownV2"
+
 			}
 		}
-
 		if _, err := b.bot.Send(msg); err != nil {
 			log.Println(err)
 		}
@@ -260,20 +265,51 @@ func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) string {
 }
 
 func (b *ScheduleBot) formMessage(schedule GetScheduleResponse) string {
-	dateString := fmt.Sprintf("Расписание на %s, %s неделя \n\n", getWeekdayName(schedule.Weekday), getWeekName(schedule.Week))
-
+	dateString := fmt.Sprintf("_ __*Расписание на %s, %s неделя*__ _\n\n", getWeekdayName(schedule.Weekday), getWeekName(schedule.Week))
+	if len(schedule.Subjects) == 0 || schedule.Subjects[0].Name == "Научно-исследовательская работа" && len(schedule.Subjects) == 1 {
+		return dateString + "_*Отдыхаем*_"
+	}
 	for _, subject := range schedule.Subjects {
-		timeString := fmt.Sprintf("%s-%s |%s\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Type)
-		audienceString := subject.Audience[0].Name
+		if subject.Audience[0].Name == "—" {
+			subject.Audience[0].Name = ""
+		}
+		if subject.Type == "—" {
+			subject.Type = ""
+		}
+		timeString := fmt.Sprintf("%s-%s | __*%s*__\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Audience[0].Name)
 		var teacherString string
 		for _, teacher := range subject.Teachers {
+			if teacher.Name == "—" {
+				teacherString = ""
+				break
+			}
 			teacherString += teacher.Name + "\n"
 		}
-
-		subjectString := fmt.Sprintf("%s | %s\n%s%s\n", subject.Name, audienceString, timeString, teacherString)
+		var typeSymbol string
+		switch subject.Type {
+		case "лк.":
+			typeSymbol = "🟩"
+		case "пр.з.":
+			typeSymbol = "🟧"
+		case "лаб.":
+			typeSymbol = "🟦"
+		default:
+			typeSymbol = "🤍"
+		}
+		subjectString := fmt.Sprintf("%s*%s |* *%s*\n%s*%s*\n", typeSymbol, subject.Name, subject.Type, timeString, teacherString)
 		dateString += subjectString
 	}
-	return dateString
+
+	return escapeSpecialChars(dateString)
+}
+
+func escapeSpecialChars(input string) string {
+	replacer := strings.NewReplacer(
+		"-", "\\-",
+		"|", "\\|",
+		".", "\\.",
+	)
+	return replacer.Replace(input)
 }
 
 func getWeekName(weekNumber int) string {

@@ -1,0 +1,4 @@
+login:
+  hash: $1$MySalt$XG6mo/8K.0Rm/2mNcxtne.
+  roles:
+      *: owner

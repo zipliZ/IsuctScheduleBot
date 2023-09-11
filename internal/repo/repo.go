@@ -2,9 +2,10 @@ package repo
 
 import (
 	"ScheduleBot/configs"
+	"log"
+
 	"github.com/restream/reindexer/v3"
 	_ "github.com/restream/reindexer/v3/bindings/cproto"
-	"log"
 )
 
 type Repo interface {

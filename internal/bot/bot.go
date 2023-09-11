@@ -3,16 +3,18 @@ package bot
 import (
 	"ScheduleBot/internal/repo"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func NewScheduleBot(token string, db *repo.BotRepo) *ScheduleBot {
@@ -51,19 +53,17 @@ func (b *ScheduleBot) Listen() {
 		var msg tgbotapi.MessageConfig
 
 		if update.Message != nil {
-
 			message := update.Message.Text
 
 			reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
 			reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
 
 			switch {
-
-			case message != "/start" && b.db.UserExists(update.Message.Chat.ID) == false:
+			case message != "/start" && !b.db.UserExists(update.Message.Chat.ID):
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы не авторизированы, нужно прописать или нажать на /start")
 
 			case reGroup.MatchString(message):
-				if b.checkGroupExist(message) {
+				if checkGroupExist(message) {
 					b.db.UpdateUser(update.Message.Chat.ID, message)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Группа установленна")
 					b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", message)
@@ -75,7 +75,6 @@ func (b *ScheduleBot) Listen() {
 			case reDate.MatchString(message):
 				msgText := b.getScheduleOnDate(update.Message.Chat.ID, message)
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-				msg.ParseMode = "MarkdownV2"
 
 			default:
 
@@ -83,7 +82,6 @@ func (b *ScheduleBot) Listen() {
 				message = strings.ToLower(message)
 
 				switch {
-
 				case message == "/help":
 					helpText := formHelpMessage()
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
@@ -99,12 +97,10 @@ func (b *ScheduleBot) Listen() {
 				case message == "сегодня":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 0)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-					msg.ParseMode = "MarkdownV2"
 
 				case message == "завтра":
 					msgText := b.getDaySchedule(update.Message.Chat.ID, 1)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-					msg.ParseMode = "MarkdownV2"
 
 				case message == "день недели":
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите день недели")
@@ -113,10 +109,9 @@ func (b *ScheduleBot) Listen() {
 				case checkWeekDay(message, &weakDay):
 					msgText := b.getWeekSchedule(update.Message.Chat.ID, weakDay)
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-					msg.ParseMode = "MarkdownV2"
 
 				case update.Message.IsCommand() && update.Message.Command() == "notify_all" && update.Message.Chat.UserName == "zipliZ":
-					msgText := strings.Split(message, "/notify_all ")[1]
+					msgText := strings.Split(update.Message.Text, "/notify_all ")[1]
 					if msgText != "" {
 						for _, user := range b.db.GetUsers() {
 							msg = tgbotapi.NewMessage(user, msgText)
@@ -139,38 +134,16 @@ func (b *ScheduleBot) Listen() {
 			if checkWeekDay(strings.ToLower(update.CallbackQuery.Data), &weakDay) {
 				msgText := b.getWeekSchedule(update.CallbackQuery.Message.Chat.ID, weakDay)
 				msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, msgText)
-				msg.ParseMode = "MarkdownV2"
-
 			}
 		}
+		msg.Text = escapeSpecialChars(msg.Text)
+		msg.ParseMode = "MarkdownV2"
 		if _, err := b.bot.Send(msg); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
-func (b *ScheduleBot) checkGroupExist(group string) bool {
-	arr := strings.Split(group, "-")
-	course, number := arr[0], arr[1]
-
-	url := "http://188.120.234.21/api"
-
-	payload := GroupExistRequest{
-		LeftPart:  course,
-		RightPart: number,
-	}
-
-	payloadJSON, marshErr := json.Marshal(payload)
-	if marshErr != nil {
-		log.Println(marshErr)
-	}
-
-	if _, err := http.Post(url, "application/json", bytes.NewBuffer(payloadJSON)); err != nil {
-		return false
-	} else {
-		return true
-	}
-}
 func (b *ScheduleBot) getWeekSchedule(chatId int64, dayOfWeekReq int) string {
 	location, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
@@ -194,18 +167,13 @@ func (b *ScheduleBot) getDaySchedule(chatId int64, offset int) string {
 	client := &http.Client{}
 
 	if group := b.db.GetGroup(chatId); group != "" {
-
 		payload := GetScheduleRequest{
 			Offset: offset,
 		}
 
-		payloadJSON, marshErr := json.Marshal(payload)
-		if marshErr != nil {
-			log.Println(marshErr)
-			return ""
-		}
+		payloadJSON, _ := json.Marshal(payload)
 
-		req, err := http.NewRequest("POST", "http://188.120.234.21/today/api", bytes.NewBuffer(payloadJSON))
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://188.120.234.21/today/api", bytes.NewBuffer(payloadJSON))
 		if err != nil {
 			log.Println(err)
 			return ""
@@ -225,7 +193,7 @@ func (b *ScheduleBot) getDaySchedule(chatId int64, offset int) string {
 		}
 		defer resp.Body.Close()
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Println(err)
 			return ""
@@ -235,7 +203,7 @@ func (b *ScheduleBot) getDaySchedule(chatId int64, offset int) string {
 			log.Println(err)
 			return ""
 		}
-		return b.formMessage(result)
+		return formMessage(result)
 	}
 	return ""
 }
@@ -258,108 +226,7 @@ func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) string {
 	}
 	if reqDate.IsZero() {
 		return "Несуществующая дата"
-	} else {
-		offset := int(reqDate.Sub(currentTime).Hours() / 24)
-		return b.getDaySchedule(chatId, offset)
 	}
-}
-
-func (b *ScheduleBot) formMessage(schedule GetScheduleResponse) string {
-	dateString := fmt.Sprintf("_ __*Расписание на %s, %s неделя*__ _\n\n", getWeekdayName(schedule.Weekday), getWeekName(schedule.Week))
-	if len(schedule.Subjects) == 0 || schedule.Subjects[0].Name == "Научно-исследовательская работа" && len(schedule.Subjects) == 1 {
-		return dateString + "_*Отдыхаем*_"
-	}
-	for _, subject := range schedule.Subjects {
-		if subject.Audience[0].Name == "—" {
-			subject.Audience[0].Name = ""
-		}
-		if subject.Type == "—" {
-			subject.Type = ""
-		}
-		timeString := fmt.Sprintf("%s-%s | __*%s*__\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Audience[0].Name)
-		var teacherString string
-		for _, teacher := range subject.Teachers {
-			if teacher.Name == "—" {
-				teacherString = ""
-				break
-			}
-			teacherString += teacher.Name + "\n"
-		}
-		var typeSymbol string
-		switch subject.Type {
-		case "лк.":
-			typeSymbol = "🟩"
-		case "пр.з.":
-			typeSymbol = "🟧"
-		case "лаб.":
-			typeSymbol = "🟦"
-		default:
-			typeSymbol = "🤍"
-		}
-		subjectString := fmt.Sprintf("%s*%s |* *%s*\n%s*%s*\n", typeSymbol, subject.Name, subject.Type, timeString, teacherString)
-		dateString += subjectString
-	}
-
-	return escapeSpecialChars(dateString)
-}
-
-func escapeSpecialChars(input string) string {
-	replacer := strings.NewReplacer(
-		"-", "\\-",
-		"|", "\\|",
-		".", "\\.",
-		"(", "\\(",
-		")", "\\)",
-	)
-	return replacer.Replace(input)
-}
-
-func getWeekName(weekNumber int) string {
-	if weekNumber%2 == 0 {
-		return "Вторая"
-	}
-	return "Первая"
-}
-
-func getWeekdayName(weekday int) string {
-	weekdays := []string{"Воскресенье", "Понедельник", "Вторник", "Среду", "Четверг", "Пятницу", "Субботу"}
-	if weekday == -1 { // вопросы к создателю api
-		return weekdays[0]
-	}
-	return weekdays[weekday]
-}
-
-func formHelpMessage() string {
-	text := `
-Фукции бота:
-• Выдавать расписание по кнопкам
-• Выдавать расписание по дате:
-    сообщение формата "08.01.2002" или "01.10.02"
-• Выдавать расписание по дню недели:
-    сообщение формата "Понедельник" или "Пн"
-• Быстро менять группу:
-    сообщение типа "4-185"
-
-По всем вопросам: @zipliZ`
-	return text
-}
-
-func checkWeekDay(message string, weakDay *int) bool {
-	switch message {
-	case "понедельник", "пн":
-		*weakDay = 1
-	case "вторник", "вт":
-		*weakDay = 2
-	case "среда", "ср":
-		*weakDay = 3
-	case "четверг", "чт":
-		*weakDay = 4
-	case "пятница", "пт":
-		*weakDay = 5
-	case "суббота", "сб":
-		*weakDay = 6
-	default:
-		return false
-	}
-	return true
+	offset := int(reqDate.Sub(currentTime).Hours() / 24)
+	return b.getDaySchedule(chatId, offset)
 }

@@ -123,17 +123,28 @@ func (b *ScheduleBot) Listen() {
 						msg = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 					}
 
-				case update.Message.IsCommand() && update.Message.Command() == "notify_all" && update.Message.Chat.UserName == "zipliZ":
-					msgText := strings.Split(update.Message.Text, "/notify_all ")[1]
-					if msgText != "" {
+				case update.Message.IsCommand() && update.Message.Chat.UserName == "zipliZ" && (update.Message.Command() == "notify_all" || update.Message.Command() == "notify_all_silent"):
+					var msgArr []string
+					silent := update.Message.Command() == "notify_all_silent"
+
+					if silent {
+						msgArr = strings.Split(update.Message.Text, "/notify_all_silent ")
+					} else {
+						msgArr = strings.Split(update.Message.Text, "/notify_all ")
+					}
+
+					if len(msgArr) > 1 && msgArr[1] != "" {
 						for _, user := range b.db.GetUsers() {
-							msg = tgbotapi.NewMessage(user, msgText)
+							msg = tgbotapi.NewMessage(user, msgArr[1])
+							msg.DisableNotification = silent
+
 							if _, err := b.bot.Send(msg); err != nil {
 								log.Println(err)
 							}
 						}
 					}
 					continue
+
 				default:
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вы ввели неправильные данные или неизвестную команду")
 				}

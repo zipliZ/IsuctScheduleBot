@@ -3,6 +3,7 @@ package repo
 import (
 	"ScheduleBot/configs"
 	"log"
+	"time"
 
 	"github.com/restream/reindexer/v3"
 	_ "github.com/restream/reindexer/v3/bindings/cproto"
@@ -35,8 +36,9 @@ func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 
 func (b *BotRepo) CreateUser(chatId int64, username string) {
 	if _, err := b.db.Insert("users", &User{
-		ChatId:   chatId,
-		Username: username,
+		ChatId:     chatId,
+		Username:   username,
+		CreateDate: time.Now().Format(time.DateTime),
 	}); err != nil {
 		log.Println(err)
 	}

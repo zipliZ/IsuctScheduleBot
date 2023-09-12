@@ -5,8 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"syscall"
+
+	"github.com/pkg/errors"
 )
 
 func escapeSpecialChars(input string) string {
@@ -109,7 +113,7 @@ func formMessage(schedule GetScheduleResponse) string {
 	return dateString
 }
 
-func checkGroupExist(group string) bool {
+func checkGroupExist(group string) (bool, error) {
 	arr := strings.Split(group, "-")
 	course, number := arr[0], arr[1]
 
@@ -125,13 +129,23 @@ func checkGroupExist(group string) bool {
 
 	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(payloadJSON))
 	if err != nil {
-		return false
+		log.Println(err)
 	}
 	request.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(request)
 	if err != nil {
-		return false
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			return false, err
+		}
+		return false, nil
 	}
 	defer response.Body.Close()
-	return true
+	return true, nil
+}
+
+func formServerErr() string {
+	serverErrString := `Проблемы на стороне сервера, ожидайте исправления
+
+По вопросам @zipliZ , @anCreny`
+	return serverErrString
 }

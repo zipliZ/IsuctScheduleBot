@@ -146,6 +146,6 @@ func checkGroupExist(group string) (bool, error) {
 func formServerErr() string {
 	serverErrString := `Проблемы на стороне сервера, ожидайте исправления
 
-По вопросам @zipliZ , @anCreny`
+По вопросам к @anCreny, если не отвечает, то к @zipliZ`
 	return serverErrString
 }

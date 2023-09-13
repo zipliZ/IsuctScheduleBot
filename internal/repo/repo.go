@@ -37,11 +37,17 @@ func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 }
 
 func (b *BotRepo) CreateUser(chatId int64, username string) {
+	location, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		log.Println("Ошибка при установке часового пояса:", err)
+		return
+	}
+	currentTime := time.Now().In(location).Format(time.DateTime)
 	if _, err := b.db.Insert("users", &User{
 		ChatId:       chatId,
 		Username:     username,
 		GroupHistory: make([]string, 4),
-		CreateDate:   time.Now().Format(time.DateTime),
+		CreateDate:   currentTime,
 	}); err != nil {
 		log.Println(err)
 	}

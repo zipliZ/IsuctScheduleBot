@@ -160,7 +160,7 @@ func (b *ScheduleBot) Listen() {
 		} else if update.CallbackQuery != nil {
 			chatID := update.CallbackQuery.Message.Chat.ID
 			callbackData := update.CallbackQuery.Data
-			var callback tgbotapi.Chattable = tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
+			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
 			msg = tgbotapi.NewMessage(chatID, "")
 
 			var err error
@@ -175,21 +175,24 @@ func (b *ScheduleBot) Listen() {
 			case reGroup.MatchString(callbackData):
 				b.db.UpdateUserGroup(chatID, callbackData)
 
-				callback = tgbotapi.NewDeleteMessage(chatID, update.CallbackQuery.Message.MessageID)
-
+				deleteCfg := tgbotapi.NewDeleteMessage(chatID, update.CallbackQuery.Message.MessageID)
+				_, deleteErr := b.bot.Request(deleteCfg)
+				if deleteErr != nil {
+					log.Println(deleteErr)
+				}
 				msg.Text = "Группа изменена"
 				b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", callbackData)
 				msg.ReplyMarkup = b.buttons.standard
-
-			default:
-				continue
 			}
+
 			_, err = b.bot.Request(callback)
 			if err != nil {
 				log.Println(err)
 			}
 		}
-
+		if msg.Text == "" {
+			continue
+		}
 		msg.Text = escapeSpecialChars(msg.Text)
 		msg.ParseMode = "MarkdownV2"
 		if _, err := b.bot.Send(msg); err != nil {

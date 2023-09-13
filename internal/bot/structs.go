@@ -13,8 +13,9 @@ type ScheduleBot struct {
 }
 
 type buttons struct {
-	standard tgbotapi.ReplyKeyboardMarkup
-	inline   tgbotapi.InlineKeyboardMarkup
+	standard           tgbotapi.ReplyKeyboardMarkup
+	inlineWeekDays     tgbotapi.InlineKeyboardMarkup
+	inlineGroupHistory tgbotapi.InlineKeyboardMarkup
 }
 
 type GroupExistRequest struct {

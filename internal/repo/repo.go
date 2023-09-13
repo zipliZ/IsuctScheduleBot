@@ -13,6 +13,8 @@ type Repo interface {
 	CreateUser(chatId int64, group string)
 	UpdateUser(chatId int64, newGroup string)
 	GetGroup(chatId int64) string
+	GetGroupHistory(chatId int64) []string
+	UpdateUserGroupHistory(chatId int64, newGroup string)
 	UserExists(chatId int64) bool
 	GetUsers(chatId int64)
 }
@@ -36,16 +38,38 @@ func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 
 func (b *BotRepo) CreateUser(chatId int64, username string) {
 	if _, err := b.db.Insert("users", &User{
-		ChatId:     chatId,
-		Username:   username,
-		CreateDate: time.Now().Format(time.DateTime),
+		ChatId:       chatId,
+		Username:     username,
+		GroupHistory: make([]string, 4),
+		CreateDate:   time.Now().Format(time.DateTime),
 	}); err != nil {
 		log.Println(err)
 	}
 }
 
-func (b *BotRepo) UpdateUser(chatId int64, newGroup string) {
+func (b *BotRepo) UpdateUserGroup(chatId int64, newGroup string) {
+	b.UpdateUserGroupHistory(chatId, newGroup)
 	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Group", newGroup).Update()
+}
+
+func (b *BotRepo) UpdateUserGroupHistory(chatId int64, newGroup string) {
+	result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
+	if !found {
+		return
+	}
+	oldGroup := result.(*User).Group
+	groupsArr := result.(*User).GroupHistory
+	if newGroup == oldGroup {
+		return
+	}
+	for i, group := range groupsArr {
+		if group == newGroup {
+			groupsArr = append(groupsArr[:i], groupsArr[i+1:]...)
+		}
+	}
+	groupsArr = append([]string{oldGroup}, groupsArr[:3]...)
+
+	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("GroupHistory", groupsArr).Update()
 }
 
 func (b *BotRepo) GetGroup(chatId int64) string {
@@ -55,9 +79,11 @@ func (b *BotRepo) GetGroup(chatId int64) string {
 	return ""
 }
 
-func (b *BotRepo) UserExists(chatId int64) bool {
-	_, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
-	return found
+func (b *BotRepo) GetGroupHistory(chatId int64) []string {
+	if result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get(); found {
+		return result.(*User).GroupHistory
+	}
+	return nil
 }
 
 func (b *BotRepo) GetUsers() []int64 {
@@ -68,4 +94,9 @@ func (b *BotRepo) GetUsers() []int64 {
 		users = append(users, iterator.Object().(*User).ChatId)
 	}
 	return users
+}
+
+func (b *BotRepo) UserExists(chatId int64) bool {
+	_, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
+	return found
 }

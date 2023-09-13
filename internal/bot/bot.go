@@ -29,7 +29,7 @@ func NewScheduleBot(token string, db *repo.BotRepo) *ScheduleBot {
 				tgbotapi.NewKeyboardButton("Смена Группы"),
 			),
 		),
-		inline: tgbotapi.NewInlineKeyboardMarkup(
+		inlineWeekDays: tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("Пн", "Понедельник"),
 				tgbotapi.NewInlineKeyboardButtonData("Вт", "Вторник"),
@@ -39,6 +39,14 @@ func NewScheduleBot(token string, db *repo.BotRepo) *ScheduleBot {
 				tgbotapi.NewInlineKeyboardButtonData("Чт", "Четверг"),
 				tgbotapi.NewInlineKeyboardButtonData("Пт", "Пятница"),
 				tgbotapi.NewInlineKeyboardButtonData("Сб", "Суббота"),
+			),
+		),
+		inlineGroupHistory: tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
+				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
+				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
+				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
 			),
 		),
 	}, bot: bot, db: db}
@@ -52,21 +60,21 @@ func (b *ScheduleBot) Listen() {
 
 	for update := range updates {
 		var msg tgbotapi.MessageConfig
+		reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
+		reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
 
 		if update.Message != nil {
 			msg = tgbotapi.NewMessage(update.Message.Chat.ID, "")
 			message := update.Message.Text
-
-			reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
-			reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
+			chatId := update.Message.Chat.ID
 
 			switch {
-			case message != "/start" && !b.db.UserExists(update.Message.Chat.ID):
+			case message != "/start" && !b.db.UserExists(chatId):
 				msg.Text = "Вы не авторизированы, нужно прописать или нажать на /start"
 
 			case reGroup.MatchString(message):
 				if exist, err := checkGroupExist(message); exist {
-					b.db.UpdateUser(update.Message.Chat.ID, message)
+					b.db.UpdateUserGroup(chatId, message)
 					msg.Text = "Группа установленна"
 					b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", message)
 					msg.ReplyMarkup = b.buttons.standard
@@ -78,7 +86,7 @@ func (b *ScheduleBot) Listen() {
 
 			case reDate.MatchString(message):
 				var err error
-				if msg.Text, err = b.getScheduleOnDate(update.Message.Chat.ID, message); err != nil {
+				if msg.Text, err = b.getScheduleOnDate(chatId, message); err != nil {
 					msg.Text = formServerErr()
 				}
 			default:
@@ -90,32 +98,41 @@ func (b *ScheduleBot) Listen() {
 					msg.Text = formHelpMessage()
 
 				case message == "/start":
-					b.db.CreateUser(update.Message.Chat.ID, update.Message.Chat.UserName)
+					b.db.CreateUser(chatId, update.Message.Chat.UserName)
 					msg.Text = "Введите номер группы в форме \"4-185\""
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				case strings.Contains(message, "сменить"):
-					msg.Text = "Введите номер группы в форме \"4-185\""
-					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+					msg.Text = "Введите номер группы в форме \"4-185\" \n\nПоследние группы:"
+					groupsArr := b.db.GetGroupHistory(chatId)
+					for i, group := range groupsArr {
+						if group == "" {
+							group = "-"
+						}
+						tempGroup := group
+						b.buttons.inlineGroupHistory.InlineKeyboard[0][i].Text = group
+						b.buttons.inlineGroupHistory.InlineKeyboard[0][i].CallbackData = &tempGroup
+					}
+					msg.ReplyMarkup = b.buttons.inlineGroupHistory
 
 				case message == "сегодня":
 					var err error
-					if msg.Text, err = b.getDaySchedule(update.Message.Chat.ID, 0); err != nil {
+					if msg.Text, err = b.getDaySchedule(chatId, 0); err != nil {
 						msg.Text = formServerErr()
 					}
 
 				case message == "завтра":
 					var err error
-					if msg.Text, err = b.getDaySchedule(update.Message.Chat.ID, 1); err != nil {
+					if msg.Text, err = b.getDaySchedule(chatId, 1); err != nil {
 						msg.Text = formServerErr()
 					}
 
 				case message == "день недели":
 					msg.Text = "Выберите день недели"
-					msg.ReplyMarkup = b.buttons.inline
+					msg.ReplyMarkup = b.buttons.inlineWeekDays
 
 				case checkWeekDay(message, &weakDay):
 					var err error
-					if msg.Text, err = b.getWeekSchedule(update.Message.Chat.ID, weakDay); err != nil {
+					if msg.Text, err = b.getWeekSchedule(chatId, weakDay); err != nil {
 						msg.Text = formServerErr()
 					}
 
@@ -141,21 +158,38 @@ func (b *ScheduleBot) Listen() {
 				}
 			}
 		} else if update.CallbackQuery != nil {
-			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
-			if _, err := b.bot.Request(callback); err != nil {
-				log.Println(err)
-			}
+			chatID := update.CallbackQuery.Message.Chat.ID
+			callbackData := update.CallbackQuery.Data
+			var callback tgbotapi.Chattable = tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
+			msg = tgbotapi.NewMessage(chatID, "")
+
+			var err error
 			var weakDay int
 
-			msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "")
-			var err error
-
-			if checkWeekDay(strings.ToLower(update.CallbackQuery.Data), &weakDay) {
-				if msg.Text, err = b.getWeekSchedule(update.CallbackQuery.Message.Chat.ID, weakDay); err != nil {
+			switch {
+			case checkWeekDay(strings.ToLower(callbackData), &weakDay):
+				if msg.Text, err = b.getWeekSchedule(chatID, weakDay); err != nil {
 					msg.Text = formServerErr()
 				}
+
+			case reGroup.MatchString(callbackData):
+				b.db.UpdateUserGroup(chatID, callbackData)
+
+				callback = tgbotapi.NewDeleteMessage(chatID, update.CallbackQuery.Message.MessageID)
+
+				msg.Text = "Группа изменена"
+				b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", callbackData)
+				msg.ReplyMarkup = b.buttons.standard
+
+			default:
+				continue
+			}
+			_, err = b.bot.Request(callback)
+			if err != nil {
+				log.Println(err)
 			}
 		}
+
 		msg.Text = escapeSpecialChars(msg.Text)
 		msg.ParseMode = "MarkdownV2"
 		if _, err := b.bot.Send(msg); err != nil {

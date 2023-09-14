@@ -135,6 +135,15 @@ func (b *ScheduleBot) Listen() {
 					if msg.Text, err = b.getWeekSchedule(chatId, weakDay); err != nil {
 						msg.Text = formServerErr()
 					}
+				case update.Message.Chat.UserName == "zipliZ" && update.Message.Poll != nil:
+					users := b.db.GetUsers()
+					for _, user := range users {
+						pollForward := tgbotapi.NewForward(user, chatId, update.Message.MessageID)
+						if _, err := b.bot.Send(pollForward); err != nil {
+							log.Println(err)
+						}
+					}
+					continue
 
 				case update.Message.Chat.UserName == "zipliZ" && (update.Message.Command() == "notify_all" || update.Message.Command() == "notify_all_silent"):
 					silent := strings.Contains(update.Message.Command(), "silent")

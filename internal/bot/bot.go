@@ -140,7 +140,7 @@ func (b *ScheduleBot) Listen() {
 					for _, user := range users {
 						pollForward := tgbotapi.NewForward(user, chatId, update.Message.MessageID)
 						if _, err := b.bot.Send(pollForward); err != nil {
-							log.Println(err)
+							log.Println(err, msg.ChatID)
 						}
 					}
 					continue
@@ -157,7 +157,7 @@ func (b *ScheduleBot) Listen() {
 							msg.DisableNotification = silent
 
 							if _, err := b.bot.Send(msg); err != nil {
-								log.Println(err)
+								log.Println(err, msg.ChatID)
 							}
 						}
 					}

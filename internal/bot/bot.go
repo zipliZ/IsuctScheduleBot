@@ -157,6 +157,7 @@ func (b *ScheduleBot) Listen() {
 							msg = tgbotapi.NewMessage(user, msgText)
 							msg.DisableNotification = silent
 
+							msg.ParseMode = "Markdown"
 							if _, err := b.bot.Send(msg); err != nil {
 								log.Println(err, msg.ChatID)
 							}

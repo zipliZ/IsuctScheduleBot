@@ -95,6 +95,9 @@ func (b *ScheduleBot) Listen() {
 				case message == "/help":
 					msg.Text = formHelpMessage()
 
+				case message == "/feedback":
+					msg.Text = formFeedbackMessage()
+
 				case message == "/start":
 					b.db.CreateUser(chatId, update.Message.Chat.UserName)
 					msg.Text = "Введите номер группы в форме \"4-185\""

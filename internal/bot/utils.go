@@ -48,6 +48,12 @@ func formHelpMessage() string {
 	return text
 }
 
+func formFeedbackMessage() string {
+	text := `
+Если ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ`
+	return text
+}
+
 func checkWeekDay(message string, weakDay *int) bool {
 	switch message {
 	case "понедельник", "пн":

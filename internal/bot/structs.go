@@ -28,9 +28,9 @@ type GetScheduleRequest struct {
 }
 
 type GetScheduleResponse struct {
-	Week     int `json:"week"`
-	Weekday  int `json:"weekday"`
-	Subjects []struct {
+	Week    int `json:"week"`
+	Weekday int `json:"weekday"`
+	Lessons []struct {
 		Name string `json:"name"`
 		Type string `json:"type"`
 		Time struct {
@@ -38,10 +38,10 @@ type GetScheduleResponse struct {
 			End   string `json:"end"`
 		} `json:"time"`
 		Audience []struct {
-			Name string `json:"name"`
+			Audience string `json:"audience"`
 		} `json:"audience"`
 		Teachers []struct {
-			Name string `json:"name"`
+			Teacher string `json:"teacher"`
 		} `json:"teachers"`
-	} `json:"subjects"`
+	} `json:"lessons"`
 }

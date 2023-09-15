@@ -2,8 +2,6 @@ package bot
 
 import (
 	"ScheduleBot/internal/repo"
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -233,37 +231,18 @@ func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
 	if group == "" {
 		return "", errors.New("группа не найдена")
 	}
-
-	payload := GetScheduleRequest{
-		Offset: offset,
-	}
-	payloadJSON, _ := json.Marshal(payload)
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://188.120.234.21/today/api", bytes.NewBuffer(payloadJSON))
+	url := fmt.Sprintf("http://188.120.234.21:9818/api/group/%s/day?offset=%d", group, offset)
+	response, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
 		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	defer response.Body.Close()
 
-	cookie := &http.Cookie{
-		Name:  "value",
-		Value: group,
+	if response.StatusCode != http.StatusOK {
+		return "", errors.New("неправильный статус ответа")
 	}
-	req.AddCookie(cookie)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Println(err)
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("ошибка HTTP: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Println(err)
 		return "", err

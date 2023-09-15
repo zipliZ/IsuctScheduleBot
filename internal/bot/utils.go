@@ -1,16 +1,10 @@
 package bot
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"syscall"
-
-	"github.com/pkg/errors"
 )
 
 func escapeSpecialChars(input string) string {
@@ -76,24 +70,24 @@ func checkWeekDay(message string, weakDay *int) bool {
 
 func formMessage(schedule GetScheduleResponse) string {
 	dateString := fmt.Sprintf("_ __*Расписание на %s, %s неделя*__ _\n\n", getWeekdayName(schedule.Weekday), getWeekName(schedule.Week))
-	if len(schedule.Subjects) == 0 || schedule.Subjects[0].Name == "Научно-исследовательская работа" && len(schedule.Subjects) == 1 {
+	if len(schedule.Lessons) == 0 || schedule.Lessons[0].Name == "Научно-исследовательская работа" && len(schedule.Lessons) == 1 {
 		return dateString + "_*Отдыхаем*_"
 	}
-	for _, subject := range schedule.Subjects {
-		if subject.Audience[0].Name == "—" {
-			subject.Audience[0].Name = ""
+	for _, subject := range schedule.Lessons {
+		if subject.Audience[0].Audience == "—" {
+			subject.Audience[0].Audience = ""
 		}
 		if subject.Type == "—" {
 			subject.Type = ""
 		}
-		timeString := fmt.Sprintf("%s-%s | __*%s*__\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Audience[0].Name)
+		timeString := fmt.Sprintf("%s-%s | __*%s*__\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Audience[0].Audience)
 		var teacherString string
 		for _, teacher := range subject.Teachers {
-			if teacher.Name == "—" {
+			if teacher.Teacher == "—" {
 				teacherString = ""
 				break
 			}
-			teacherString += teacher.Name + "\n"
+			teacherString += teacher.Teacher + "\n"
 		}
 		var typeSymbol string
 		switch subject.Type {
@@ -114,32 +108,15 @@ func formMessage(schedule GetScheduleResponse) string {
 }
 
 func checkGroupExist(group string) (bool, error) {
-	arr := strings.Split(group, "-")
-	course, number := arr[0], arr[1]
-
-	url := "http://188.120.234.21/api"
-
-	payload := GroupExistRequest{
-		LeftPart:  course,
-		RightPart: number,
-	}
-	payloadJSON, _ := json.Marshal(payload)
-
-	client := http.Client{}
-
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewBuffer(payloadJSON))
+	url := fmt.Sprintf("http://188.120.234.21:9818/api/check/%s", group)
+	request, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
+		return false, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	response, err := client.Do(request)
-	if err != nil {
-		if errors.Is(err, syscall.ECONNREFUSED) {
-			return false, err
-		}
+	if request.StatusCode != 200 {
 		return false, nil
 	}
-	defer response.Body.Close()
 	return true, nil
 }
 

@@ -13,5 +13,6 @@ func main() {
 	db := repo.NewBotRepo(cfg.Db)
 	scheduleBot := bot.NewScheduleBot(cfg.Bot.Token, db)
 	log.Println("Bot started")
+	go scheduleBot.NotifyUsers()
 	scheduleBot.Listen()
 }

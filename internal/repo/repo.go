@@ -11,12 +11,15 @@ import (
 
 type Repo interface {
 	CreateUser(chatId int64, group string)
-	UpdateUser(chatId int64, newGroup string)
+	UpdateUserGroup(chatId int64, newGroup string)
 	GetGroup(chatId int64) string
 	GetGroupHistory(chatId int64) []string
 	UpdateUserGroupHistory(chatId int64, newGroup string)
 	UserExists(chatId int64) bool
-	GetUsers(chatId int64)
+	GetUsers() []int64
+	IsDailyNotifierOn(chatId int64) bool
+	GetNotificationOn() []int64
+	UpdateNotificationStatus(chatId int64, status bool)
 }
 
 type BotRepo struct {
@@ -44,10 +47,11 @@ func (b *BotRepo) CreateUser(chatId int64, username string) {
 	}
 	currentTime := time.Now().In(location).Format(time.DateTime)
 	if _, err := b.db.Insert("users", &User{
-		ChatId:       chatId,
-		Username:     username,
-		GroupHistory: make([]string, 4),
-		CreateDate:   currentTime,
+		ChatId:        chatId,
+		Username:      username,
+		GroupHistory:  make([]string, 4),
+		DailyNotifier: false,
+		CreateDate:    currentTime,
 	}); err != nil {
 		log.Println(err)
 	}
@@ -105,4 +109,23 @@ func (b *BotRepo) GetUsers() []int64 {
 func (b *BotRepo) UserExists(chatId int64) bool {
 	_, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
 	return found
+}
+
+func (b *BotRepo) IsDailyNotifierOn(chatId int64) bool {
+	_, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).And().Where("DailyNotifier", reindexer.EQ, true).Get()
+	return found
+}
+
+func (b *BotRepo) GetNotificationOn() []int64 {
+	iterator := b.db.Query("users").Where("DailyNotifier", reindexer.EQ, true).Exec()
+	defer iterator.Close()
+	var users []int64
+	for iterator.Next() {
+		users = append(users, iterator.Object().(*User).ChatId)
+	}
+	return users
+}
+
+func (b *BotRepo) UpdateNotificationStatus(chatId int64, status bool) {
+	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("DailyNotifier", status).Update()
 }

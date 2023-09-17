@@ -16,7 +16,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func NewScheduleBot(token string, db *repo.BotRepo) *ScheduleBot {
+func NewScheduleBot(token string, db repo.Repo) *ScheduleBot {
 	bot, _ := tgbotapi.NewBotAPI(token)
 	return &ScheduleBot{buttons: buttons{
 		standard: tgbotapi.NewReplyKeyboard(
@@ -89,6 +89,7 @@ func (b *ScheduleBot) Listen() {
 				}
 			default:
 				var weakDay int
+				var digit int
 				message = strings.ToLower(message)
 
 				switch {
@@ -97,6 +98,15 @@ func (b *ScheduleBot) Listen() {
 
 				case message == "/feedback":
 					msg.Text = formFeedbackMessage()
+
+				case message == "/toggle_notifier":
+					if b.db.IsDailyNotifierOn(chatId) {
+						b.db.UpdateNotificationStatus(chatId, false)
+						msg.Text = "Получение ежедневного расписание выключено"
+					} else {
+						b.db.UpdateNotificationStatus(chatId, true)
+						msg.Text = "Получение ежедневного расписание включено"
+					}
 
 				case message == "/start":
 					b.db.CreateUser(chatId, update.Message.Chat.UserName)
@@ -124,6 +134,11 @@ func (b *ScheduleBot) Listen() {
 				case message == "завтра":
 					var err error
 					if msg.Text, err = b.getDaySchedule(chatId, 1); err != nil {
+						msg.Text = formServerErr()
+					}
+				case isDigit(message, &digit):
+					var err error
+					if msg.Text, err = b.getDaySchedule(chatId, digit); err != nil {
 						msg.Text = formServerErr()
 					}
 
@@ -208,6 +223,38 @@ func (b *ScheduleBot) Listen() {
 		msg.ParseMode = "MarkdownV2"
 		if _, err := b.bot.Send(msg); err != nil {
 			log.Println(err)
+		}
+	}
+}
+
+func (b *ScheduleBot) NotifyUsers() {
+	location, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		log.Println("Ошибка при установке часового пояса:", err)
+		return
+	}
+
+	for {
+		currentTime := time.Now().In(location).Format("15:04:05")
+		if currentTime == "4:20:00" {
+			usersToNotify := b.db.GetNotificationOn()
+
+			for _, user := range usersToNotify {
+				msgText, err := b.getDaySchedule(user, 0)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				msgText = "_*Доброго утречка💟, высылаю тебе сегодняшний день😘*_\n\n" + msgText
+				msg := tgbotapi.NewMessage(user, escapeSpecialChars(msgText))
+				msg.ParseMode = "MarkdownV2"
+				msg.DisableNotification = true
+				_, err = b.bot.Send(msg)
+				if err != nil {
+					log.Println(err, user)
+				}
+			}
+			time.Sleep(1 * time.Second)
 		}
 	}
 }

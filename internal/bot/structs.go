@@ -8,7 +8,7 @@ import (
 
 type ScheduleBot struct {
 	bot     *tgbotapi.BotAPI
-	db      *repo.BotRepo
+	db      repo.Repo
 	buttons buttons
 }
 

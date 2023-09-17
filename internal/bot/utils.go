@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -124,6 +125,15 @@ func checkGroupExist(group string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+func isDigit(message string, digit *int) bool {
+	var err error
+	*digit, err = strconv.Atoi(message)
+	if err != nil {
+		return false
+	}
+	return true
+
 }
 
 func formServerErr() string {

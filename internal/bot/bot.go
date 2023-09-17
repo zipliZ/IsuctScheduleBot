@@ -23,8 +23,11 @@ func NewScheduleBot(token string, db repo.Repo) *ScheduleBot {
 			tgbotapi.NewKeyboardButtonRow(
 				tgbotapi.NewKeyboardButton("Сегодня"),
 				tgbotapi.NewKeyboardButton("Завтра"),
-				tgbotapi.NewKeyboardButton("День недели"),
-				tgbotapi.NewKeyboardButton("Смена Группы"),
+				tgbotapi.NewKeyboardButton("Неделя"),
+			),
+			tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton("Полное расписание"),
+				tgbotapi.NewKeyboardButton("Сменить (3-185)"),
 			),
 		),
 		inlineWeekDays: tgbotapi.NewInlineKeyboardMarkup(
@@ -97,15 +100,15 @@ func (b *ScheduleBot) Listen() {
 					msg.Text = formHelpMessage()
 
 				case message == "/feedback":
-					msg.Text = formFeedbackMessage()
+					msg.Text = `Если ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ`
 
 				case message == "/toggle_notifier":
 					if b.db.IsDailyNotifierOn(chatId) {
 						b.db.UpdateNotificationStatus(chatId, false)
-						msg.Text = "Получение ежедневного расписание выключено"
+						msg.Text = "Получение ежедневного расписания выключено"
 					} else {
 						b.db.UpdateNotificationStatus(chatId, true)
-						msg.Text = "Получение ежедневного расписание включено"
+						msg.Text = "Получение ежедневного расписания включено"
 					}
 
 				case message == "/start":
@@ -142,9 +145,16 @@ func (b *ScheduleBot) Listen() {
 						msg.Text = formServerErr()
 					}
 
-				case message == "день недели":
+				case message == "неделя":
 					msg.Text = "Выберите день недели"
 					msg.ReplyMarkup = b.buttons.inlineWeekDays
+				case message == "полное расписание":
+					group := b.db.GetGroup(chatId)
+					if group == "" {
+						msg.Text = "У вас не установленна группа"
+					} else {
+						msg.Text = fmt.Sprintf("__*Ваше полное расписание:*__\nhttp://isuctschedule.ru/share/group/%s", group)
+					}
 
 				case checkWeekDay(message, &weakDay):
 					var err error
@@ -207,7 +217,7 @@ func (b *ScheduleBot) Listen() {
 					log.Println(deleteErr)
 				}
 				msg.Text = "Группа изменена"
-				b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", callbackData)
+				b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", callbackData)
 				msg.ReplyMarkup = b.buttons.standard
 			}
 

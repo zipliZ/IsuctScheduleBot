@@ -34,27 +34,6 @@ func getWeekdayName(weekday int) string {
 	return weekdays[weekday]
 }
 
-func formHelpMessage() string {
-	text := `
-Фукции бота:
-• Выдавать расписание по кнопкам
-• Выдавать расписание по дате:
-    сообщение формата "08.01.2002" или "01.10.02"
-• Выдавать расписание по дню недели:
-    сообщение формата "Понедельник" или "Пн"
-• Быстро менять группу:
-    сообщение типа "4-185"
-
-По всем вопросам: @zipliZ`
-	return text
-}
-
-func formFeedbackMessage() string {
-	text := `
-Если ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ`
-	return text
-}
-
 func checkWeekDay(message string, weakDay *int) bool {
 	switch message {
 	case "понедельник", "пн":
@@ -126,6 +105,7 @@ func checkGroupExist(group string) (bool, error) {
 	}
 	return true, nil
 }
+
 func isDigit(message string, digit *int) bool {
 	var err error
 	*digit, err = strconv.Atoi(message)
@@ -136,8 +116,36 @@ func isDigit(message string, digit *int) bool {
 
 }
 
+func formHelpMessage() string {
+	text := `
+__*Фукции бота:*__
+• Выдавать расписание по кнопкам
+
+• Выдавать расписание по дате:
+    сообщение формата "08.01.2002" или "01.10.02"
+
+• Выдавать расписание по дню недели:
+    сообщение формата "Понедельник" или "Пн"
+
+• Быстро менять группу:
+    сообщение типа "4-185"
+
+• Быстро получать расписание по цифрам:
+    0 — получить сегодняшний день
+    1 — получить завтрашний день
+   -1 — получить вчерашний день
+
+• Включение/выключение ежедневной утренней рассылки расписания на текущий день
+   (используйте /toggle\_notifier)
+
+
+*Если у тебя есть вопросы или ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ*`
+	return text
+}
+
 func formServerErr() string {
-	serverErrString := `Проблемы на стороне сервера, ожидайте исправления
+	serverErrString := `
+Проблемы на стороне сервера, ожидайте исправления
 
 По вопросам к @anCreny, если не отвечает, то к @zipliZ`
 	return serverErrString

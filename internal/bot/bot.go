@@ -77,7 +77,7 @@ func (b *ScheduleBot) Listen() {
 				if exist, err := checkGroupExist(message); exist {
 					b.db.UpdateUserGroup(chatId, message)
 					msg.Text = "Группа установленна"
-					b.buttons.standard.Keyboard[0][3].Text = fmt.Sprintf("Сменить (%s)", message)
+					b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", message)
 					msg.ReplyMarkup = b.buttons.standard
 				} else if err != nil {
 					msg.Text = formServerErr()

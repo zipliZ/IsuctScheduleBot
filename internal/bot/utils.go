@@ -60,13 +60,21 @@ func formMessage(schedule GetScheduleResponse) string {
 		return dateString + "_*Отдыхаем*_"
 	}
 	for _, subject := range schedule.Lessons {
+		var audienceString string
+		for _, audience := range subject.Audience {
+			if audience.Audience == "-" {
+				audience.Audience = ""
+				break
+			}
+			audienceString += " " + "__*" + audience.Audience + "*__"
+		}
 		if subject.Audience[0].Audience == "—" {
 			subject.Audience[0].Audience = ""
 		}
 		if subject.Type == "—" {
 			subject.Type = ""
 		}
-		timeString := fmt.Sprintf("%s-%s | __*%s*__\n", subject.Time.Start[0:5], subject.Time.End[0:5], subject.Audience[0].Audience)
+		timeString := fmt.Sprintf("%s-%s |%s\n", subject.Time.Start[0:5], subject.Time.End[0:5], audienceString)
 		var teacherString string
 		for _, teacher := range subject.Teachers {
 			if teacher.Teacher == "—" {

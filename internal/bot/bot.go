@@ -246,7 +246,7 @@ func (b *ScheduleBot) NotifyUsers() {
 
 	for {
 		currentTime := time.Now().In(location).Format("15:04:05")
-		if currentTime == "4:20:00" {
+		if currentTime == "04:20:00" {
 			usersToNotify := b.db.GetNotificationOn()
 
 			for _, user := range usersToNotify {

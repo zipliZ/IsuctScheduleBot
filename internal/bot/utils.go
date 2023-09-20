@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -62,14 +63,11 @@ func formMessage(schedule GetScheduleResponse) string {
 	for _, subject := range schedule.Lessons {
 		var audienceString string
 		for _, audience := range subject.Audience {
-			if audience.Audience == "-" {
+			if audience.Audience == "—" {
 				audience.Audience = ""
 				break
 			}
 			audienceString += " " + "__*" + audience.Audience + "*__"
-		}
-		if subject.Audience[0].Audience == "—" {
-			subject.Audience[0].Audience = ""
 		}
 		if subject.Type == "—" {
 			subject.Type = ""
@@ -103,15 +101,35 @@ func formMessage(schedule GetScheduleResponse) string {
 
 func checkGroupExist(group string) (bool, error) {
 	url := fmt.Sprintf("http://188.120.234.21:9818/api/check/%s", group)
-	request, err := http.Get(url)
+	response, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
 		return false, err
 	}
-	if request.StatusCode != 200 {
+	if response.StatusCode != 200 {
 		return false, nil
 	}
 	return true, nil
+}
+
+func getCommonTeacherNames(name string) ([]string, error) {
+	url := fmt.Sprintf("http://188.120.234.21:9818/api/associatedWith/%s", name)
+	response, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return nil, nil
+	}
+
+	var teachersNames []string
+	if decodeErr := json.NewDecoder(response.Body).Decode(&teachersNames); decodeErr != nil {
+		return nil, err
+	}
+	return teachersNames, nil
 }
 
 func isDigit(message string, digit *int) bool {
@@ -127,24 +145,28 @@ func isDigit(message string, digit *int) bool {
 func formHelpMessage() string {
 	text := `
 __*Фукции бота:*__
-• Выдавать расписание по кнопкам
+• *Выдавать расписание по кнопкам*
 
-• Выдавать расписание по дате:
-    сообщение формата "08.01.2002" или "01.10.02"
+• *Выдавать расписание по дате:*
+    "08.01.2002" или "01.10.02"
 
-• Выдавать расписание по дню недели:
-    сообщение формата "Понедельник" или "Пн"
+• *Выдавать расписание по дню недели:*
+    "Понедельник" или "Пн"
 
-• Быстро менять группу:
+• *Быстро менять группу:*
     сообщение типа "4-185"
 
-• Быстро получать расписание по цифрам:
+• *Включение/выключение ежедневной утренней рассылки расписания на текущий день*
+   (используйте /toggle\_notifier)
+
+• *Искать расписание преподавателя:*
+    "Поиск Константинов"
+    "Поиск Конст"
+
+• *Быстро получать расписание по цифрам:*
     0 — получить сегодняшний день
     1 — получить завтрашний день
    -1 — получить вчерашний день
-
-• Включение/выключение ежедневной утренней рассылки расписания на текущий день
-   (используйте /toggle\_notifier)
 
 
 *Если у тебя есть вопросы или ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ*`

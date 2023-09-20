@@ -115,6 +115,7 @@ func (b *ScheduleBot) Listen() {
 					b.db.CreateUser(chatId, update.Message.Chat.UserName)
 					msg.Text = "Введите номер группы в форме \"4-185\""
 					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+
 				case strings.Contains(message, "сменить"):
 					msg.Text = "Введите номер группы в форме \"4-185\" \n\nПоследние группы:"
 					groupsArr := b.db.GetGroupHistory(chatId)
@@ -139,6 +140,7 @@ func (b *ScheduleBot) Listen() {
 					if msg.Text, err = b.getDaySchedule(chatId, 1); err != nil {
 						msg.Text = formServerErr()
 					}
+
 				case isDigit(message, &digit):
 					var err error
 					if msg.Text, err = b.getDaySchedule(chatId, digit); err != nil {
@@ -148,6 +150,7 @@ func (b *ScheduleBot) Listen() {
 				case message == "неделя":
 					msg.Text = "Выберите день недели"
 					msg.ReplyMarkup = b.buttons.inlineWeekDays
+
 				case message == "полное расписание":
 					group := b.db.GetGroup(chatId)
 					if group == "" {
@@ -161,6 +164,25 @@ func (b *ScheduleBot) Listen() {
 					if msg.Text, err = b.getWeekSchedule(chatId, weakDay); err != nil {
 						msg.Text = formServerErr()
 					}
+
+				case strings.HasPrefix(message, "поиск"):
+					msgArr := strings.Split(message, " ")
+					msgText := strings.Join(msgArr[1:], " ")
+
+					if msgText == "" {
+						msg.Text = "Вы забыли ввести фамилию"
+
+					} else if namesArr, err := getCommonTeacherNames(msgText); err != nil {
+						msg.Text = formServerErr()
+
+					} else if len(namesArr) == 0 {
+						msg.Text = "Такого преподавателя не существует"
+
+					} else {
+						msg.Text = "Выберите нужного вам преподавателя"
+						msg.ReplyMarkup = b.getTeacherButtons(namesArr)
+					}
+
 				case update.Message.Chat.UserName == "zipliZ" && update.Message.Poll != nil:
 					users := b.db.GetUsers()
 					for _, user := range users {
@@ -170,7 +192,6 @@ func (b *ScheduleBot) Listen() {
 						}
 					}
 					continue
-
 				case update.Message.Chat.UserName == "zipliZ" && (update.Message.Command() == "notify_all" || update.Message.Command() == "notify_all_silent"):
 					silent := strings.Contains(update.Message.Command(), "silent")
 
@@ -344,4 +365,17 @@ func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) (string, erro
 	offset := int(reqDate.Sub(currentTime).Hours() / 24)
 
 	return b.getDaySchedule(chatId, offset)
+}
+
+func (b *ScheduleBot) getTeacherButtons(names []string) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, name := range names {
+		url := fmt.Sprintf("http://isuctschedule.ru/share/teacher/%s", name)
+		button := tgbotapi.NewInlineKeyboardButtonURL(name, url)
+		row := tgbotapi.NewInlineKeyboardRow(button)
+		rows = append(rows, row)
+	}
+
+	inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	return inlineKeyboard
 }

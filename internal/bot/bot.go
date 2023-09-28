@@ -76,7 +76,7 @@ func (b *ScheduleBot) Listen() {
 			case reGroup.MatchString(message):
 				if exist, err := checkGroupExist(message); exist {
 					b.db.UpdateUserGroup(chatId, message)
-					msg.Text = "Группа установленна"
+					msg.Text = "Группа установлена"
 					b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", message)
 					msg.ReplyMarkup = b.buttons.standard
 				} else if err != nil {
@@ -154,7 +154,7 @@ func (b *ScheduleBot) Listen() {
 				case message == "полное расписание":
 					group := b.db.GetGroup(chatId)
 					if group == "" {
-						msg.Text = "У вас не установленна группа"
+						msg.Text = "У вас не установлена группа"
 					} else {
 						msg.Text = fmt.Sprintf("__*Ваше полное расписание:*__\nhttp://isuctschedule.ru/share/group/%s", group)
 					}

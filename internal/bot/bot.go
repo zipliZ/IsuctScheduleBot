@@ -102,6 +102,14 @@ func (b *ScheduleBot) Listen() {
 				case message == "/feedback":
 					msg.Text = `Если ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ`
 
+				case message == "/donate":
+					msg.Text = `
+*Если вы очень великодушный, пожертвовать можно:*
+• По номеру телефона:
+		__\+79807393606__
+• По ссылке: 
+		__https://www.tinkoff.ru/cf/9y6xKQyaGH3__`
+
 				case message == "/toggle_notifier":
 					if b.db.IsDailyNotifierOn(chatId) {
 						b.db.UpdateNotificationStatus(chatId, false)

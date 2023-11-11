@@ -104,11 +104,19 @@ func (b *ScheduleBot) Listen() {
 
 				case message == "/donate":
 					msg.Text = `
-*Если вы очень великодушный, пожертвовать можно:*
+*Топ любимых нами жорика-спасателей:*
+	*1.__Денис С.__ — 1000р.*
+	*2.__Александр И.__ — 300.р*
+	*3.__Дмитрий Л.__ — 25\0.р*
+
+*С каждым донатом вы сохраняете жизнь минимум одному жорику, задумайтесь.
+Если вы тоже не любите есть жориков или хотели бы висеть сверху, пожертвовать можно:*
 • По номеру телефона:
 		__\+79807393606__
 • По ссылке: 
-		__https://www.tinkoff.ru/cf/9y6xKQyaGH3__`
+		__https://www.tinkoff.ru/cf/9y6xKQyaGH3__
+
+*жорик — 🪳*`
 
 				case message == "/toggle_notifier":
 					if b.db.IsDailyNotifierOn(chatId) {
@@ -250,19 +258,23 @@ func (b *ScheduleBot) Listen() {
 				msg.ReplyMarkup = b.buttons.standard
 			}
 
-			_, err = b.bot.Request(callback)
-			if err != nil {
-				log.Println(err)
-			}
+			go func() {
+				_, err = b.bot.Request(callback)
+				if err != nil {
+					log.Println(err)
+				}
+			}()
 		}
 		if msg.Text == "" {
 			continue
 		}
 		msg.Text = escapeSpecialChars(msg.Text)
 		msg.ParseMode = "MarkdownV2"
-		if _, err := b.bot.Send(msg); err != nil {
-			log.Println(err)
-		}
+		go func() {
+			if _, err := b.bot.Send(msg); err != nil {
+				log.Println(err, msg.ChatID)
+			}
+		}()
 	}
 }
 

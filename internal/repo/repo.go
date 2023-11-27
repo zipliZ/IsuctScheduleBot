@@ -20,6 +20,7 @@ type Repo interface {
 	IsDailyNotifierOn(chatId int64) bool
 	GetNotificationOn() []int64
 	UpdateNotificationStatus(chatId int64, status bool)
+	GetTop3Donators() []Donator
 }
 
 type BotRepo struct {
@@ -32,6 +33,10 @@ func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 		panic(err)
 	}
 	err := database.OpenNamespace("users", reindexer.DefaultNamespaceOptions(), User{})
+	if err != nil {
+		panic(err)
+	}
+	err = database.OpenNamespace("donators", reindexer.DefaultNamespaceOptions(), Donator{})
 	if err != nil {
 		panic(err)
 	}
@@ -128,4 +133,17 @@ func (b *BotRepo) GetNotificationOn() []int64 {
 
 func (b *BotRepo) UpdateNotificationStatus(chatId int64, status bool) {
 	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("DailyNotifier", status).Update()
+}
+
+func (b *BotRepo) GetTop3Donators() []Donator {
+	items, err := b.db.Query("donators").Sort("amountOfDonation", true).Limit(3).Exec().FetchAll()
+	if err != nil {
+		log.Println(err)
+	}
+	var donators []Donator
+	for _, item := range items {
+		donator := item.(*Donator)
+		donators = append(donators, *donator)
+	}
+	return donators
 }

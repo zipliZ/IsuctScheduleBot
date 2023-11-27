@@ -8,3 +8,9 @@ type User struct {
 	DailyNotifier bool     `reindex:"DailyNotifier"`
 	CreateDate    string   `reindex:"CreateDate"`
 }
+
+type Donator struct {
+	Id               int    `reindex:"id,,pk"`
+	Name             string `reindex:"name"`
+	AmountOfDonation int    `reindex:"amountOfDonation"`
+}

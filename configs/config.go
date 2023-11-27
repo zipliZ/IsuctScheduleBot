@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	Db  DbConfig  `yaml:"db"`
-	Bot BotConfig `yaml:"bot"`
+	Db        DbConfig  `yaml:"db"`
+	Bot       BotConfig `yaml:"bot"`
+	Endpoints Endpoints `yaml:"endpoints"`
 }
 
 type DbConfig struct {
@@ -21,6 +22,11 @@ type DbConfig struct {
 
 type BotConfig struct {
 	Token string `yaml:"token"`
+}
+
+type Endpoints struct {
+	Microservice string `yaml:"microservice"`
+	Frontend     string `yaml:"frontend"`
 }
 
 func DecodeConfig() Config {

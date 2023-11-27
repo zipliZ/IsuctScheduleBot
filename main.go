@@ -11,7 +11,7 @@ func main() {
 	cfg := configs.DecodeConfig()
 
 	db := repo.NewBotRepo(cfg.Db)
-	scheduleBot := bot.NewScheduleBot(cfg.Bot.Token, db)
+	scheduleBot := bot.NewScheduleBot(cfg.Bot.Token, db, cfg.Endpoints)
 	log.Println("Bot started")
 	go scheduleBot.NotifyUsers()
 	scheduleBot.Listen()

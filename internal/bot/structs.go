@@ -1,15 +1,17 @@
 package bot
 
 import (
+	"ScheduleBot/configs"
 	"ScheduleBot/internal/repo"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type ScheduleBot struct {
-	bot     *tgbotapi.BotAPI
-	db      repo.Repo
-	buttons buttons
+	bot       *tgbotapi.BotAPI
+	db        repo.Repo
+	buttons   buttons
+	endpoints configs.Endpoints
 }
 
 type buttons struct {

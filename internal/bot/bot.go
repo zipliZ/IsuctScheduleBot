@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"ScheduleBot/configs"
 	"ScheduleBot/internal/repo"
 	"encoding/json"
 	"errors"
@@ -16,7 +17,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func NewScheduleBot(token string, db repo.Repo) *ScheduleBot {
+func NewScheduleBot(token string, db repo.Repo, endpoints configs.Endpoints) *ScheduleBot {
 	bot, _ := tgbotapi.NewBotAPI(token)
 	return &ScheduleBot{buttons: buttons{
 		standard: tgbotapi.NewReplyKeyboard(
@@ -50,7 +51,7 @@ func NewScheduleBot(token string, db repo.Repo) *ScheduleBot {
 				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
 			),
 		),
-	}, bot: bot, db: db}
+	}, bot: bot, db: db, endpoints: endpoints}
 }
 
 func (b *ScheduleBot) Listen() {
@@ -74,7 +75,7 @@ func (b *ScheduleBot) Listen() {
 				msg.Text = "Вы не авторизированы, нужно прописать или нажать на /start"
 
 			case reGroup.MatchString(message):
-				if exist, err := checkGroupExist(message); exist {
+				if exist, err := checkGroupExist(b.endpoints.Microservice, message); exist {
 					b.db.UpdateUserGroup(chatId, message)
 					msg.Text = "Группа установлена"
 					b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", message)
@@ -103,11 +104,12 @@ func (b *ScheduleBot) Listen() {
 					msg.Text = `Если ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ`
 
 				case message == "/donate":
-					msg.Text = `
+					donators := b.db.GetTop3Donators()
+					msg.Text = fmt.Sprintf(`
 *Топ любимых нами жорика-спасателей:*
-	*1.__Данила Р.__ — 2500р.*
-	*1.__Денис С.__ — 1000р.*
-	*3.__Дарья С.__ — 350р.*
+	*1.__%s__ — %dр.*
+	*2.__%s__ — %dр.*
+	*3.__%s__ — %dр.*
 
 *С каждым донатом вы сохраняете жизнь минимум одному жорику, задумайтесь.
 Если вы тоже не любите есть жориков или хотели бы висеть сверху, пожертвовать можно:*
@@ -116,7 +118,11 @@ func (b *ScheduleBot) Listen() {
 • По ссылке: 
 		__https://www.tinkoff.ru/cf/9y6xKQyaGH3__
 
-*жорик — 🪳*`
+*жорик — 🪳*`,
+						donators[0].Name, donators[0].AmountOfDonation,
+						donators[1].Name, donators[1].AmountOfDonation,
+						donators[2].Name, donators[2].AmountOfDonation,
+					)
 
 				case message == "/toggle_notifier":
 					if b.db.IsDailyNotifierOn(chatId) {
@@ -172,7 +178,7 @@ func (b *ScheduleBot) Listen() {
 					if group == "" {
 						msg.Text = "У вас не установлена группа"
 					} else {
-						msg.Text = fmt.Sprintf("__*Ваше полное расписание:*__\nhttp://isuctschedule.ru/share/group/%s", group)
+						msg.Text = fmt.Sprintf("__*Ваше полное расписание:*__\n%s/share/group/%s", b.endpoints.Frontend, group)
 					}
 
 				case checkWeekDay(message, &weakDay):
@@ -188,7 +194,7 @@ func (b *ScheduleBot) Listen() {
 					if msgText == "" {
 						msg.Text = "Вы забыли ввести фамилию"
 
-					} else if namesArr, err := getCommonTeacherNames(msgText); err != nil {
+					} else if namesArr, err := getCommonTeacherNames(b.endpoints.Microservice, msgText); err != nil {
 						msg.Text = formServerErr()
 
 					} else if len(namesArr) == 0 {
@@ -333,7 +339,7 @@ func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
 	if group == "" {
 		return "", errors.New("группа не найдена")
 	}
-	url := fmt.Sprintf("http://188.120.234.21:9818/api/group/%s/day?offset=%d", group, offset)
+	url := fmt.Sprintf("%s/api/group/%s/day?offset=%d", b.endpoints.Microservice, group, offset)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
@@ -390,7 +396,7 @@ func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) (string, erro
 func (b *ScheduleBot) getTeacherButtons(names []string) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, name := range names {
-		url := fmt.Sprintf("http://isuctschedule.ru/share/teacher/%s", name)
+		url := fmt.Sprintf("%s/share/teacher/%s", b.endpoints.Frontend, name)
 		button := tgbotapi.NewInlineKeyboardButtonURL(name, url)
 		row := tgbotapi.NewInlineKeyboardRow(button)
 		rows = append(rows, row)

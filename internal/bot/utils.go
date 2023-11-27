@@ -99,8 +99,8 @@ func formMessage(schedule GetScheduleResponse) string {
 	return dateString
 }
 
-func checkGroupExist(group string) (bool, error) {
-	url := fmt.Sprintf("http://188.120.234.21:9818/api/check/%s", group)
+func checkGroupExist(microUrl, group string) (bool, error) {
+	url := fmt.Sprintf("%s/api/check/%s", microUrl, group)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
@@ -112,8 +112,8 @@ func checkGroupExist(group string) (bool, error) {
 	return true, nil
 }
 
-func getCommonTeacherNames(name string) ([]string, error) {
-	url := fmt.Sprintf("http://188.120.234.21:9818/api/associatedWith/%s", name)
+func getCommonTeacherNames(microUrl, name string) ([]string, error) {
+	url := fmt.Sprintf("%s/api/associatedWith/%s", microUrl, name)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Println(err)

@@ -7,3 +7,7 @@ db:
 
 bot:
   token: "6055714135:AAHJdRC6t6XWH1k-JI2ufXMlBHkL-9Q8L58"
+
+endpoints:
+  microservice: "http://default"
+  frontend: "http://isuct-schedule.ru"

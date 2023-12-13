@@ -3,30 +3,24 @@ package bot
 import (
 	"ScheduleBot/configs"
 	"ScheduleBot/internal/repo"
-
+	"ScheduleBot/internal/service"
+	"ScheduleBot/internal/store"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type ScheduleBot struct {
 	bot       *tgbotapi.BotAPI
-	db        repo.Repo
+	repo      repo.Repo
+	service   service.Service
+	store     *store.NotifierStore
 	buttons   buttons
 	endpoints configs.Endpoints
 }
 
 type buttons struct {
-	standard           tgbotapi.ReplyKeyboardMarkup
-	inlineWeekDays     tgbotapi.InlineKeyboardMarkup
-	inlineGroupHistory tgbotapi.InlineKeyboardMarkup
-}
-
-type GroupExistRequest struct {
-	LeftPart  string `json:"leftPart"`
-	RightPart string `json:"rightPart"`
-}
-
-type GetScheduleRequest struct {
-	Offset int `json:"offset"`
+	standard            tgbotapi.ReplyKeyboardMarkup
+	inlineWeekDays      tgbotapi.InlineKeyboardMarkup
+	inlineHolderHistory tgbotapi.InlineKeyboardMarkup
 }
 
 type GetScheduleResponse struct {

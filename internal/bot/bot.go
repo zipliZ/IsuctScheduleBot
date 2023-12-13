@@ -3,21 +3,21 @@ package bot
 import (
 	"ScheduleBot/configs"
 	"ScheduleBot/internal/repo"
+	"ScheduleBot/internal/service"
+	"ScheduleBot/internal/store"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 	_ "time/tzdata"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func NewScheduleBot(token string, db repo.Repo, endpoints configs.Endpoints) *ScheduleBot {
+func NewScheduleBot(token string, repo repo.Repo, service service.Service, store *store.NotifierStore, endpoints configs.Endpoints) *ScheduleBot {
 	bot, _ := tgbotapi.NewBotAPI(token)
 	return &ScheduleBot{buttons: buttons{
 		standard: tgbotapi.NewReplyKeyboard(
@@ -43,15 +43,21 @@ func NewScheduleBot(token string, db repo.Repo, endpoints configs.Endpoints) *Sc
 				tgbotapi.NewInlineKeyboardButtonData("Сб", "Суббота"),
 			),
 		),
-		inlineGroupHistory: tgbotapi.NewInlineKeyboardMarkup(
+		inlineHolderHistory: tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("?", "?"),
 			),
 		),
-	}, bot: bot, db: db, endpoints: endpoints}
+	}, bot: bot, repo: repo, service: service, store: store, endpoints: endpoints}
 }
 
 func (b *ScheduleBot) Listen() {
@@ -61,265 +67,74 @@ func (b *ScheduleBot) Listen() {
 	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		var msg tgbotapi.MessageConfig
-		reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
-		reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
-
-		if update.Message != nil {
-			msg = tgbotapi.NewMessage(update.Message.Chat.ID, "")
-			message := update.Message.Text
-			chatId := update.Message.Chat.ID
-
-			switch {
-			case message != "/start" && !b.db.UserExists(chatId):
-				msg.Text = "Вы не авторизированы, нужно прописать или нажать на /start"
-
-			case reGroup.MatchString(message):
-				if exist, err := checkGroupExist(b.endpoints.Microservice, message); exist {
-					b.db.UpdateUserGroup(chatId, message)
-					msg.Text = "Группа установлена"
-					b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", message)
-					msg.ReplyMarkup = b.buttons.standard
-				} else if err != nil {
-					msg.Text = formServerErr()
-				} else {
-					msg.Text = "Такой группы не существует"
-				}
-
-			case reDate.MatchString(message):
-				var err error
-				if msg.Text, err = b.getScheduleOnDate(chatId, message); err != nil {
-					msg.Text = formServerErr()
-				}
-			default:
-				var weakDay int
-				var digit int
-				message = strings.ToLower(message)
-
-				switch {
-				case message == "/help":
-					msg.Text = formHelpMessage()
-
-				case message == "/feedback":
-					msg.Text = `Если ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ`
-
-				case message == "/donate":
-					donators := b.db.GetTop3Donators()
-					msg.Text = fmt.Sprintf(`
-*Топ любимых нами жорика-спасателей:*
-	*1.__%s__ — %dр.*
-	*2.__%s__ — %dр.*
-	*3.__%s__ — %dр.*
-
-*С каждым донатом вы сохраняете жизнь минимум одному жорику, задумайтесь.
-Если вы тоже не любите есть жориков или хотели бы висеть сверху, пожертвовать можно:*
-• По номеру телефона:
-		__\+79807393606__
-• По ссылке: 
-		__https://www.tinkoff.ru/cf/9y6xKQyaGH3__
-
-*жорик — 🪳*`,
-						donators[0].Name, donators[0].AmountOfDonation,
-						donators[1].Name, donators[1].AmountOfDonation,
-						donators[2].Name, donators[2].AmountOfDonation,
-					)
-
-				case message == "/toggle_notifier":
-					if b.db.IsDailyNotifierOn(chatId) {
-						b.db.UpdateNotificationStatus(chatId, false)
-						msg.Text = "Получение ежедневного расписания выключено"
-					} else {
-						b.db.UpdateNotificationStatus(chatId, true)
-						msg.Text = "Получение ежедневного расписания включено"
-					}
-
-				case message == "/start":
-					b.db.CreateUser(chatId, update.Message.Chat.UserName)
-					msg.Text = "Введите номер группы в форме \"4-185\""
-					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-
-				case strings.Contains(message, "сменить"):
-					msg.Text = "Введите номер группы в форме \"4-185\" \n\nПоследние группы:"
-					groupsArr := b.db.GetGroupHistory(chatId)
-					for i, group := range groupsArr {
-						if group == "" {
-							group = "-"
-						}
-						tempGroup := group
-						b.buttons.inlineGroupHistory.InlineKeyboard[0][i].Text = group
-						b.buttons.inlineGroupHistory.InlineKeyboard[0][i].CallbackData = &tempGroup
-					}
-					msg.ReplyMarkup = b.buttons.inlineGroupHistory
-
-				case message == "сегодня":
-					var err error
-					if msg.Text, err = b.getDaySchedule(chatId, 0); err != nil {
-						msg.Text = formServerErr()
-					}
-
-				case message == "завтра":
-					var err error
-					if msg.Text, err = b.getDaySchedule(chatId, 1); err != nil {
-						msg.Text = formServerErr()
-					}
-
-				case isDigit(message, &digit):
-					var err error
-					if msg.Text, err = b.getDaySchedule(chatId, digit); err != nil {
-						msg.Text = formServerErr()
-					}
-
-				case message == "неделя":
-					msg.Text = "Выберите день недели"
-					msg.ReplyMarkup = b.buttons.inlineWeekDays
-
-				case message == "полное расписание":
-					group := b.db.GetGroup(chatId)
-					if group == "" {
-						msg.Text = "У вас не установлена группа"
-					} else {
-						msg.Text = fmt.Sprintf("__*Ваше полное расписание:*__\n%s/share/group/%s", b.endpoints.Frontend, group)
-					}
-
-				case checkWeekDay(message, &weakDay):
-					var err error
-					if msg.Text, err = b.getWeekSchedule(chatId, weakDay); err != nil {
-						msg.Text = formServerErr()
-					}
-
-				case strings.HasPrefix(message, "поиск"):
-					msgArr := strings.Split(message, " ")
-					msgText := strings.Join(msgArr[1:], " ")
-
-					if msgText == "" {
-						msg.Text = "Вы забыли ввести фамилию"
-
-					} else if namesArr, err := getCommonTeacherNames(b.endpoints.Microservice, msgText); err != nil {
-						msg.Text = formServerErr()
-
-					} else if len(namesArr) == 0 {
-						msg.Text = "Такого преподавателя не существует"
-
-					} else {
-						msg.Text = "Выберите нужного вам преподавателя"
-						msg.ReplyMarkup = b.getTeacherButtons(namesArr)
-					}
-
-				case update.Message.Chat.UserName == "zipliZ" && update.Message.Poll != nil:
-					users := b.db.GetUsers()
-					for _, user := range users {
-						pollForward := tgbotapi.NewForward(user, chatId, update.Message.MessageID)
-						if _, err := b.bot.Send(pollForward); err != nil {
-							log.Println(err, msg.ChatID)
-						}
-					}
-					continue
-				case update.Message.Chat.UserName == "zipliZ" && (update.Message.Command() == "notify_all" || update.Message.Command() == "notify_all_silent"):
-					silent := strings.Contains(update.Message.Command(), "silent")
-
-					msgArr := strings.Split(update.Message.Text, " ")
-					msgText := strings.Join(msgArr[1:], " ")
-
-					if len(msgArr) > 1 && msgText != "" {
-						for _, user := range b.db.GetUsers() {
-							msg = tgbotapi.NewMessage(user, msgText)
-							msg.DisableNotification = silent
-
-							msg.ParseMode = "Markdown"
-							if _, err := b.bot.Send(msg); err != nil {
-								log.Println(err, msg.ChatID)
-							}
-						}
-					}
-					continue
-				default:
-					msg.Text = "Вы ввели неправильные данные или неизвестную команду"
-				}
-			}
-		} else if update.CallbackQuery != nil {
-			chatID := update.CallbackQuery.Message.Chat.ID
-			callbackData := update.CallbackQuery.Data
-			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
-			msg = tgbotapi.NewMessage(chatID, "")
-
+		go func(update tgbotapi.Update) {
+			var msg tgbotapi.MessageConfig
 			var err error
-			var weakDay int
 
-			switch {
-			case checkWeekDay(strings.ToLower(callbackData), &weakDay):
-				if msg.Text, err = b.getWeekSchedule(chatID, weakDay); err != nil {
-					msg.Text = formServerErr()
-				}
-
-			case reGroup.MatchString(callbackData):
-				b.db.UpdateUserGroup(chatID, callbackData)
-
-				deleteCfg := tgbotapi.NewDeleteMessage(chatID, update.CallbackQuery.Message.MessageID)
-				_, deleteErr := b.bot.Request(deleteCfg)
-				if deleteErr != nil {
-					log.Println(deleteErr)
-				}
-				msg.Text = "Группа изменена"
-				b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", callbackData)
-				msg.ReplyMarkup = b.buttons.standard
-			}
-
-			go func() {
-				_, err = b.bot.Request(callback)
+			if update.Message != nil {
+				msg, err = b.handleMessage(update.Message)
 				if err != nil {
-					log.Println(err)
+					slog.Error("handling message", err, "chat_id", update.Message.Chat.ID, "message", update.Message.Text)
 				}
-			}()
-		}
-		if msg.Text == "" {
-			continue
-		}
-		msg.Text = escapeSpecialChars(msg.Text)
-		msg.ParseMode = "MarkdownV2"
-		go func() {
-			if _, err := b.bot.Send(msg); err != nil {
-				log.Println(err, msg.ChatID)
+			} else if update.CallbackQuery != nil {
+				msg, err = b.handleCallback(update.CallbackQuery)
+				if err != nil {
+					slog.Error("handling callback", err, "chat_id", update.CallbackQuery.Message.Chat.ID, "data", update.CallbackQuery.Data)
+				}
 			}
-		}()
+
+			if msg.Text == "" {
+				return
+			}
+			msg.Text = escapeSpecialChars(msg.Text)
+			msg.ParseMode = "MarkdownV2"
+
+			if _, err := b.bot.Send(msg); err != nil {
+				slog.Error("sending message :", err, "chat_id:", msg.ChatID)
+			}
+		}(update)
+
 	}
 }
 
 func (b *ScheduleBot) NotifyUsers() {
 	location, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
-		log.Println("Ошибка при установке часового пояса:", err)
+		slog.Error("Ошибка при установке часового пояса:", err)
 		return
 	}
 
+	ticker := time.NewTicker(1 * time.Minute)
 	for {
-		currentTime := time.Now().In(location).Format("15:04:05")
-		if currentTime == "04:20:00" {
-			usersToNotify := b.db.GetNotificationOn()
-
+		currentTime := time.Now().In(location).Format("15:04")
+		if usersToNotify, exist := b.store.Get(currentTime); exist {
+			sendTicker := time.NewTicker(time.Second / 30)
 			for _, user := range usersToNotify {
-				msgText, err := b.getDaySchedule(user, 0)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				msgText = "_*Доброго утречка💟, высылаю тебе сегодняшний день😘*_\n\n" + msgText
-				msg := tgbotapi.NewMessage(user, escapeSpecialChars(msgText))
-				msg.ParseMode = "MarkdownV2"
-				msg.DisableNotification = true
-				_, err = b.bot.Send(msg)
-				if err != nil {
-					log.Println(err, user)
-				}
+				go func(chatId int64) {
+					msgText, err := b.getDaySchedule(chatId, 0)
+					if err != nil {
+						slog.Error("getting schedule: ", err)
+						return
+					}
+					msgText = "_*Высылаю тебе сегодняшний день😘*_\n\n" + msgText
+					msg := tgbotapi.NewMessage(chatId, escapeSpecialChars(msgText))
+					msg.ParseMode = "MarkdownV2"
+					msg.DisableNotification = true
+					_, err = b.bot.Send(msg)
+					if err != nil {
+						slog.Error("sending notification: ", err, "chat_id", chatId)
+					}
+				}(user)
+				<-sendTicker.C
 			}
-			time.Sleep(1 * time.Second)
 		}
+		<-ticker.C
 	}
 }
 
 func (b *ScheduleBot) getWeekSchedule(chatId int64, dayOfWeekReq int) (string, error) {
 	location, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
-		log.Println("Ошибка при установке часового пояса:", err)
 		return "", err
 	}
 	currentDay := time.Now().In(location)
@@ -335,14 +150,19 @@ func (b *ScheduleBot) getWeekSchedule(chatId int64, dayOfWeekReq int) (string, e
 }
 
 func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
-	group := b.db.GetGroup(chatID)
-	if group == "" {
-		return "", errors.New("группа не найдена")
+	isStudent, holder := b.repo.GetUserInfo(chatID)
+	if holder == "" {
+		return "", errors.New("холдер пустой")
 	}
-	url := fmt.Sprintf("%s/api/group/%s/day?offset=%d", b.endpoints.Microservice, group, offset)
+
+	holderType := "teacher"
+	if isStudent {
+		holderType = "group"
+	}
+
+	url := fmt.Sprintf("%s/api/%s/%s/day?offset=%d", b.endpoints.Microservice, holderType, holder, offset)
 	response, err := http.Get(url)
 	if err != nil {
-		log.Println(err)
 		return "", err
 	}
 	defer response.Body.Close()
@@ -352,13 +172,11 @@ func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
 	}
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		log.Println(err)
 		return "", err
 	}
 
 	var result GetScheduleResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		log.Println(err)
 		return "", err
 	}
 
@@ -368,9 +186,9 @@ func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
 func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) (string, error) {
 	location, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
-		log.Println("Ошибка при установке часового пояса:", err)
 		return "", err
 	}
+
 	currentTime := time.Now().In(location)
 	currentTime = time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), 0, 0, 0, 0, time.UTC)
 
@@ -385,9 +203,11 @@ func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) (string, erro
 	if err != nil {
 		return "", err
 	}
+
 	if reqDate.IsZero() {
 		return "", errors.New("не существующая дата")
 	}
+
 	offset := int(reqDate.Sub(currentTime).Hours() / 24)
 
 	return b.getDaySchedule(chatId, offset)

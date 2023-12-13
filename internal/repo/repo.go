@@ -3,6 +3,7 @@ package repo
 import (
 	"ScheduleBot/configs"
 	"log"
+	"log/slog"
 	"time"
 
 	"github.com/restream/reindexer/v3"
@@ -10,21 +11,19 @@ import (
 )
 
 type Repo interface {
-	CreateUser(chatId int64, group string)
-	UpdateUserGroup(chatId int64, newGroup string)
-	GetGroup(chatId int64) string
-	GetGroupHistory(chatId int64) []string
-	UpdateUserGroupHistory(chatId int64, newGroup string)
+	CreateUser(chatId int64, username string)
+	UpdateUserHolder(chatId int64, isStudent bool, newHolder string)
+	GetUserInfo(chatId int64) (bool, string)
+	GetHistory(chatId int64) []string
+	UpdateUserHistory(chatId int64, newGroup string)
 	UserExists(chatId int64) bool
 	GetUsers() []int64
-	IsDailyNotifierOn(chatId int64) bool
-	GetNotificationOn() []int64
 	UpdateNotificationStatus(chatId int64, status bool)
 	GetTop3Donators() []Donator
-}
-
-type BotRepo struct {
-	db *reindexer.Reindexer
+	IsDailyNotifierOn(chatId int64) bool
+	GetUserTimer(chatId int64) string
+	GetNotificationOn() []UsersToNotify
+	UpdateUserTimer(chatId int64, timer string)
 }
 
 func NewBotRepo(cfg configs.DbConfig) *BotRepo {
@@ -47,56 +46,56 @@ func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 func (b *BotRepo) CreateUser(chatId int64, username string) {
 	location, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
-		log.Println("Ошибка при установке часового пояса:", err)
+		slog.Error("Ошибка при установке часового пояса:", err)
 		return
 	}
 	currentTime := time.Now().In(location).Format(time.DateTime)
 	if _, err := b.db.Insert("users", &User{
 		ChatId:        chatId,
 		Username:      username,
-		GroupHistory:  make([]string, 4),
+		History:       make([]string, 4),
 		DailyNotifier: false,
 		CreateDate:    currentTime,
 	}); err != nil {
-		log.Println(err)
+		slog.Error("creating user", err)
 	}
 }
 
-func (b *BotRepo) UpdateUserGroup(chatId int64, newGroup string) {
-	b.UpdateUserGroupHistory(chatId, newGroup)
-	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Group", newGroup).Update()
+func (b *BotRepo) UpdateUserHolder(chatId int64, isStudent bool, newHolder string) {
+	b.UpdateUserHistory(chatId, newHolder)
+	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Holder", newHolder).Set("IsStudent", isStudent).Update()
 }
 
-func (b *BotRepo) UpdateUserGroupHistory(chatId int64, newGroup string) {
+func (b *BotRepo) UpdateUserHistory(chatId int64, newGroup string) {
 	result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
 	if !found {
 		return
 	}
-	oldGroup := result.(*User).Group
-	groupsArr := result.(*User).GroupHistory
-	if newGroup == oldGroup {
+	oldHolder := result.(*User).Holder
+	historyArr := result.(*User).History
+	if newGroup == oldHolder {
 		return
 	}
-	for i, group := range groupsArr {
-		if group == newGroup {
-			groupsArr = append(groupsArr[:i], groupsArr[i+1:]...)
+	for i, holder := range historyArr {
+		if holder == newGroup {
+			historyArr = append(historyArr[:i], historyArr[i+1:]...)
 		}
 	}
-	groupsArr = append([]string{oldGroup}, groupsArr[:3]...)
+	historyArr = append([]string{oldHolder}, historyArr[:3]...)
 
-	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("GroupHistory", groupsArr).Update()
+	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("History", historyArr).Update()
 }
 
-func (b *BotRepo) GetGroup(chatId int64) string {
+func (b *BotRepo) GetUserInfo(chatId int64) (bool, string) {
 	if result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get(); found {
-		return result.(*User).Group
+		return result.(*User).IsStudent, result.(*User).Holder
 	}
-	return ""
+	return false, ""
 }
 
-func (b *BotRepo) GetGroupHistory(chatId int64) []string {
+func (b *BotRepo) GetHistory(chatId int64) []string {
 	if result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get(); found {
-		return result.(*User).GroupHistory
+		return result.(*User).History
 	}
 	return nil
 }
@@ -121,12 +120,27 @@ func (b *BotRepo) IsDailyNotifierOn(chatId int64) bool {
 	return found
 }
 
-func (b *BotRepo) GetNotificationOn() []int64 {
+func (b *BotRepo) GetUserTimer(chatId int64) string {
+	if result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get(); found {
+		return result.(*User).Timer
+	}
+	return ""
+}
+
+func (b *BotRepo) UpdateUserTimer(chatId int64, timer string) {
+	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Timer", timer).Update()
+}
+
+func (b *BotRepo) GetNotificationOn() []UsersToNotify {
 	iterator := b.db.Query("users").Where("DailyNotifier", reindexer.EQ, true).Exec()
 	defer iterator.Close()
-	var users []int64
+	var users []UsersToNotify
 	for iterator.Next() {
-		users = append(users, iterator.Object().(*User).ChatId)
+		user := iterator.Object().(*User)
+		users = append(users, UsersToNotify{
+			ChatId: user.ChatId,
+			Time:   user.Timer,
+		})
 	}
 	return users
 }

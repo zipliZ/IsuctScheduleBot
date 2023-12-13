@@ -1,12 +1,14 @@
 package bot
 
 import (
+	"ScheduleBot/internal/repo"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func escapeSpecialChars(input string) string {
@@ -99,8 +101,13 @@ func formMessage(schedule GetScheduleResponse) string {
 	return dateString
 }
 
-func checkGroupExist(microUrl, group string) (bool, error) {
-	url := fmt.Sprintf("%s/api/check/%s", microUrl, group)
+func checkHolderExist(microUrl string, isStudent bool, holder string) (bool, error) {
+	holderType := "teacher"
+	if isStudent {
+		holderType = "group"
+	}
+
+	url := fmt.Sprintf("%s/api/check/%s/%s", microUrl, holderType, holder)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
@@ -114,12 +121,18 @@ func checkGroupExist(microUrl, group string) (bool, error) {
 
 func getCommonTeacherNames(microUrl, name string) ([]string, error) {
 	url := fmt.Sprintf("%s/api/associatedWith/%s", microUrl, name)
-	response, err := http.Get(url)
+
+	client := http.Client{Timeout: 5 * time.Second}
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
-	defer response.Body.Close()
+
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
 
 	if response.StatusCode != 200 {
 		return nil, nil
@@ -153,11 +166,14 @@ __*Фукции бота:*__
 • *Выдавать расписание по дню недели:*
     "Понедельник" или "Пн"
 
-• *Быстро менять группу:*
-    сообщение типа "4-185"
+• *Быстро менять группу/преподавателя:*
+	"4-185" или "Константинов Е.С."
 
-• *Включение/выключение ежедневной утренней рассылки расписания на текущий день*
+• *Включение/выключение ежедневной рассылки расписания на текущий день*
    (используйте /toggle\_notifier)
+
+• *Установка времени оповещения*
+	"таймер 04:19"
 
 • *Искать расписание преподавателя:*
     "Поиск Константинов"
@@ -167,6 +183,9 @@ __*Фукции бота:*__
     0 — получить сегодняшний день
     1 — получить завтрашний день
    -1 — получить вчерашний день
+
+• *Получить список топ донатеров*
+	(используйте /donate)
 
 
 *Если у тебя есть вопросы или ты придумал как можно улучшить нашего бота или нашел баг, то обязательно напиши @zipliZ*`
@@ -179,4 +198,36 @@ func formServerErr() string {
 
 По вопросам к @anCreny, если не отвечает, то к @zipliZ`
 	return serverErrString
+}
+
+func formDonatorsMessage(donators []repo.Donator) string {
+	return fmt.Sprintf(`
+*Топ любимых нами жорика-спасателей:*
+	*1.__%s__ — %dр.*
+	*2.__%s__ — %dр.*
+	*3.__%s__ — %dр.*
+
+*С каждым донатом вы сохраняете жизнь минимум одному жорику, задумайтесь.
+Если вы тоже не любите есть жориков или хотели бы висеть сверху, пожертвовать можно:*
+• По номеру телефона:
+		__\+79807393606__
+• По ссылке: 
+		__https://www.tinkoff.ru/cf/9y6xKQyaGH3__
+
+*жорик — 🪳*`,
+		donators[0].Name, donators[0].AmountOfDonation,
+		donators[1].Name, donators[1].AmountOfDonation,
+		donators[2].Name, donators[2].AmountOfDonation,
+	)
+}
+
+func formStartMessage() string {
+	return `
+*Если вы студент, введите номер группы*
+ пример \"4-185\"
+*Если вы учитель, то введите свое ФИО*
+ пример \"Константинов Е.С.\"
+
+Весь список команд \можно посмотреть командой */help*
+`
 }

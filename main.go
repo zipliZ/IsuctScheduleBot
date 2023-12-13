@@ -4,15 +4,20 @@ import (
 	"ScheduleBot/configs"
 	"ScheduleBot/internal/bot"
 	"ScheduleBot/internal/repo"
-	"log"
+	"ScheduleBot/internal/service"
+	"ScheduleBot/internal/store"
+	"log/slog"
 )
 
 func main() {
-	cfg := configs.DecodeConfig()
+	cfg := configs.DecodeConfig("./config.yaml")
 
-	db := repo.NewBotRepo(cfg.Db)
-	scheduleBot := bot.NewScheduleBot(cfg.Bot.Token, db, cfg.Endpoints)
-	log.Println("Bot started")
+	botRepo := repo.NewBotRepo(cfg.Db)
+	notifierStore := store.NewNotifierStore()
+	botService := service.NewBotService(botRepo, *notifierStore)
+	scheduleBot := bot.NewScheduleBot(cfg.Bot.Token, botRepo, botService, notifierStore, cfg.Endpoints)
+	botService.RestoreNotifications()
+	slog.Info("Bot started")
 	go scheduleBot.NotifyUsers()
 	scheduleBot.Listen()
 }

@@ -29,8 +29,8 @@ type Endpoints struct {
 	Frontend     string `yaml:"frontend"`
 }
 
-func DecodeConfig() Config {
-	f, err := os.Open("./config.yaml")
+func DecodeConfig(path string) Config {
+	f, err := os.Open(path)
 	if err != nil {
 		panic(err)
 	}

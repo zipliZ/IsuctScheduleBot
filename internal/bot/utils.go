@@ -109,7 +109,7 @@ func checkHolderExist(microUrl string, isStudent bool, holder string) (bool, err
 	}
 
 	url := fmt.Sprintf("%s/api/check/%s/%s", microUrl, holderType, holder)
-	response, err := http.Get(url)
+	response, err := http.Get(url) //nolint
 	if err != nil {
 		log.Println(err)
 		return false, err
@@ -130,7 +130,7 @@ func getCommonTeacherNames(microUrl, name string) ([]string, error) {
 		return nil, err
 	}
 
-	response, err := client.Do(req) //nolint:gosec
+	response, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

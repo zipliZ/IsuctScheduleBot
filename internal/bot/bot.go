@@ -104,30 +104,35 @@ func (b *ScheduleBot) NotifyUsers() {
 	}
 
 	ticker := time.NewTicker(1 * time.Minute)
-	for {
+	for range ticker.C {
 		currentTime := time.Now().In(location).Format("15:04")
 		if usersToNotify, exist := b.store.Get(currentTime); exist {
-			sendTicker := time.NewTicker(time.Second / 30)
-			for _, user := range usersToNotify {
-				go func(chatId int64) {
-					msgText, err := b.getDaySchedule(chatId, 0)
-					if err != nil {
-						slog.Error("getting schedule: ", err)
-						return
-					}
-					msgText = "_*Высылаю тебе сегодняшний день😘*_\n\n" + msgText
-					msg := tgbotapi.NewMessage(chatId, escapeSpecialChars(msgText))
-					msg.ParseMode = "MarkdownV2"
-					msg.DisableNotification = true
-					_, err = b.bot.Send(msg)
-					if err != nil {
-						slog.Error("sending notification: ", err, "chat_id", chatId)
-					}
-				}(user)
-				<-sendTicker.C
-			}
+			go b.alertUsers(usersToNotify)
 		}
-		<-ticker.C
+	}
+}
+
+func (b *ScheduleBot) alertUsers(usersToNotify []int64) {
+	sendTicker := time.NewTicker(time.Second / 30)
+	for _, user := range usersToNotify {
+		go b.sendUserAlert(user)
+		<-sendTicker.C
+	}
+}
+
+func (b *ScheduleBot) sendUserAlert(chatId int64) {
+	msgText, err := b.getDaySchedule(chatId, 0)
+	if err != nil {
+		slog.Error("getting schedule: ", err)
+		return
+	}
+	msgText = "_*Высылаю тебе сегодняшний день😘*_\n\n" + msgText
+	msg := tgbotapi.NewMessage(chatId, escapeSpecialChars(msgText))
+	msg.ParseMode = "MarkdownV2"
+	msg.DisableNotification = true
+	_, err = b.bot.Send(msg)
+	if err != nil {
+		slog.Error("sending notification: ", err, "chat_id", chatId)
 	}
 }
 
@@ -160,7 +165,7 @@ func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
 	}
 
 	url := fmt.Sprintf("%s/api/%s/%s/day?offset=%d", b.endpoints.Microservice, holderType, holder, offset)
-	response, err := http.Get(url) //nolint:gosec
+	response, err := http.Get(url) //nolint
 	if err != nil {
 		return "", err
 	}

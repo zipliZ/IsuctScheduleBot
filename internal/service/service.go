@@ -48,5 +48,5 @@ func (s *BotService) RestoreNotifications() {
 	for _, user := range users {
 		s.store.StoreUser(user.Time, user.ChatId)
 	}
-	slog.Info("Уведомления востановленны")
+	slog.Info("Notifications are restored")
 }

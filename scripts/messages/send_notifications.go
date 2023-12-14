@@ -16,7 +16,7 @@ import (
 func main() {
 	text := `
 
-Текст сообщения  [http://isuct\-schedule\.ru/share/teacher/Константинов\-Е\.С\.]
+Текст сообщения
 
 `
 	silent := true
@@ -83,15 +83,16 @@ func main() {
 				})
 			}(user, &messages, &sendErrors)
 		}
-		wg.Wait()
-		msgLog.Messages = messages
-		msgLog.SendErrs = sendErrors
-		msgLog.SentTime = time.Now().Unix()
+	}
 
-		_, insertErr := db.Insert("sent_msg_logs", msgLog, "id=serial()")
-		if insertErr != nil {
-			panic(insertErr)
-		}
+	wg.Wait()
+	msgLog.Messages = messages
+	msgLog.SendErrs = sendErrors
+	msgLog.SentTime = time.Now().Unix()
+
+	_, insertErr := db.Insert("sent_msg_logs", msgLog, "id=serial()")
+	if insertErr != nil {
+		panic(insertErr)
 	}
 	fmt.Println("Сообщения отправленны")
 

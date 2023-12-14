@@ -10,11 +10,13 @@ import (
 type Service interface {
 	ToggleNotification(chatId int64) string
 	UpdateTimer(chatId int64, newTime string) string
-	RestoreNotifications()
+	RestoreNotificationsMap()
 }
 
-func NewBotService(repo r.Repo, store s.NotifierStore) *BotService {
-	return &BotService{repo: repo, store: store}
+func Init(repo r.Repo, store s.NotifierStore) *BotService {
+	botService := BotService{repo: repo, store: store}
+	botService.RestoreNotificationsMap()
+	return &botService
 }
 
 func (s *BotService) ToggleNotification(chatId int64) string {
@@ -43,7 +45,7 @@ func (s *BotService) UpdateTimer(chatId int64, newTime string) string {
 	return fmt.Sprintf("Время оповещения установленно на %s", newTime)
 }
 
-func (s *BotService) RestoreNotifications() {
+func (s *BotService) RestoreNotificationsMap() {
 	users := s.repo.GetNotificationOn()
 	for _, user := range users {
 		s.store.StoreUser(user.Time, user.ChatId)

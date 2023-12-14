@@ -2,7 +2,7 @@ package store
 
 import "sync"
 
-func NewNotifierStore() *NotifierStore {
+func New() *NotifierStore {
 	return &NotifierStore{data: make(map[string][]int64), mutex: &sync.RWMutex{}}
 }
 

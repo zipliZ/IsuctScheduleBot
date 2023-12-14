@@ -26,7 +26,7 @@ type Repo interface {
 	UpdateUserTimer(chatId int64, timer string)
 }
 
-func NewBotRepo(cfg configs.DbConfig) *BotRepo {
+func New(cfg configs.DbConfig) *BotRepo {
 	database := reindexer.NewReindex("cproto://"+cfg.User+":"+cfg.Pass+"@"+cfg.Host+":"+cfg.Port+"/"+cfg.DbName, reindexer.WithCreateDBIfMissing())
 	if err := database.Ping(); err != nil {
 		log.Panic(err)

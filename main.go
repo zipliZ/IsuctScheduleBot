@@ -12,12 +12,10 @@ import (
 func main() {
 	cfg := configs.DecodeConfig("./config.yaml")
 
-	botRepo := repo.NewBotRepo(cfg.Db)
-	notifierStore := store.NewNotifierStore()
-	botService := service.NewBotService(botRepo, *notifierStore)
-	scheduleBot := bot.NewScheduleBot(cfg.Bot.Token, botRepo, botService, notifierStore, cfg.Endpoints)
-	botService.RestoreNotifications()
+	botRepo := repo.New(cfg.Db)
+	notifierStore := store.New()
+	botService := service.Init(botRepo, *notifierStore)
+	scheduleBot := bot.Init(cfg.Bot.Token, botRepo, botService, notifierStore, cfg.Endpoints)
 	slog.Info("Bot started")
-	go scheduleBot.NotifyUsers()
 	scheduleBot.Listen()
 }

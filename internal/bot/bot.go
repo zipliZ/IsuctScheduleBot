@@ -17,9 +17,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func NewScheduleBot(token string, repo repo.Repo, service service.Service, store *store.NotifierStore, endpoints configs.Endpoints) *ScheduleBot {
+func Init(token string, repo repo.Repo, service service.Service, store *store.NotifierStore, endpoints configs.Endpoints) *ScheduleBot {
 	bot, _ := tgbotapi.NewBotAPI(token)
-	return &ScheduleBot{buttons: buttons{
+	scheduleBot := ScheduleBot{buttons: buttons{
 		standard: tgbotapi.NewReplyKeyboard(
 			tgbotapi.NewKeyboardButtonRow(
 				tgbotapi.NewKeyboardButton("Сегодня"),
@@ -58,6 +58,11 @@ func NewScheduleBot(token string, repo repo.Repo, service service.Service, store
 			),
 		),
 	}, bot: bot, repo: repo, service: service, store: store, endpoints: endpoints}
+
+	// Запуск горутины отвечающей за рассылку ежедневного расписания
+	go scheduleBot.InitUsersNotification()
+
+	return &scheduleBot
 }
 
 func (b *ScheduleBot) Listen() {
@@ -96,7 +101,7 @@ func (b *ScheduleBot) Listen() {
 	}
 }
 
-func (b *ScheduleBot) NotifyUsers() {
+func (b *ScheduleBot) InitUsersNotification() {
 	location, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
 		slog.Error("Ошибка при установке часового пояса:", err)

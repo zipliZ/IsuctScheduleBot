@@ -68,15 +68,15 @@ func main() {
 				}
 			}(message, &sendErrors)
 		}
-		wg.Wait()
-		msgLog.Messages = messages
-		msgLog.SendErrs = sendErrors
-		msgLog.SentTime = time.Now().Unix()
+	}
+	wg.Wait()
+	msgLog.Messages = messages
+	msgLog.SendErrs = sendErrors
+	msgLog.SentTime = time.Now().Unix()
 
-		_, insertErr := db.Update("sent_msg_logs", msgLog)
-		if insertErr != nil {
-			panic(insertErr)
-		}
+	_, insertErr := db.Update("sent_msg_logs", msgLog)
+	if insertErr != nil {
+		panic(insertErr)
 	}
 	fmt.Println("Сообщения обновленны")
 }

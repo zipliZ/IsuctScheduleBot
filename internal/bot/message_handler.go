@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -10,8 +11,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.MessageConfig, error) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "")
+func (b *ScheduleBot) handleMessage(ctx context.Context, message *tgbotapi.Message) (tgbotapi.MessageConfig, error) {
+	msg := NewMessage(message.Chat.ID, "", false)
 	msgText := strings.ToLower(message.Text)
 	chatId := message.Chat.ID
 
@@ -28,7 +29,7 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 		msg.Text = "Вы не авторизированы, нужно прописать или нажать на /start"
 
 	case reGroup.MatchString(msgText):
-		if exist, checkErr := checkHolderExist(b.endpoints.Microservice, true, msgText); exist {
+		if exist, checkErr := checkHolderExistence(b.endpoints.Microservice, true, msgText); exist {
 			b.repo.UpdateUserHolder(chatId, true, msgText)
 			msg.Text = "Группа установлена"
 			b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", msgText)
@@ -41,7 +42,7 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 		}
 
 	case reTeacher.MatchString(message.Text):
-		if exist, checkErr := checkHolderExist(b.endpoints.Microservice, false, message.Text); exist {
+		if exist, checkErr := checkHolderExistence(b.endpoints.Microservice, false, message.Text); exist {
 			b.repo.UpdateUserHolder(chatId, false, message.Text)
 			msg.Text = "Преподаватель выбран"
 			b.buttons.standard.Keyboard[1][1].Text = fmt.Sprintf("Сменить (%s)", message.Text)
@@ -54,7 +55,7 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 		}
 
 	case reDate.MatchString(msgText):
-		if msg.Text, err = b.getScheduleOnDate(chatId, msgText); err != nil {
+		if msg.Text, err = b.getScheduleOnDate(ctx, chatId, msgText); err != nil {
 			msg.Text = formServerErr()
 		}
 
@@ -110,17 +111,17 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 		msg.ReplyMarkup = b.buttons.inlineHolderHistory
 
 	case msgText == "сегодня":
-		if msg.Text, err = b.getDaySchedule(chatId, 0); err != nil {
+		if msg.Text, err = b.getDaySchedule(ctx, chatId, 0); err != nil {
 			msg.Text = formServerErr()
 		}
 
 	case msgText == "завтра":
-		if msg.Text, err = b.getDaySchedule(chatId, 1); err != nil {
+		if msg.Text, err = b.getDaySchedule(ctx, chatId, 1); err != nil {
 			msg.Text = formServerErr()
 		}
 
 	case isDigit(msgText, &digit):
-		if msg.Text, err = b.getDaySchedule(chatId, digit); err != nil {
+		if msg.Text, err = b.getDaySchedule(ctx, chatId, digit); err != nil {
 			msg.Text = formServerErr()
 		}
 
@@ -131,18 +132,18 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 	case msgText == "полное расписание":
 		isStudent, holder := b.repo.GetUserInfo(chatId)
 		if holder == "" {
-			msg.Text = "У вас не установлена группа"
+			msg.Text = "У вас не установлена группа или преподаватель"
 		} else {
-			holderType := "group"
+			holderType := holderTypeGroup
 			if !isStudent {
-				holderType = "teacher"
+				holderType = holderTypeTeacher
 				holder = strings.ReplaceAll(holder, " ", "-")
 			}
 			msg.Text = fmt.Sprintf("__*Ваше полное расписание:*__\n[%s/share/%s/%s]", b.endpoints.Frontend, holderType, holder)
 		}
 
 	case checkWeekDay(msgText, &weakDay):
-		if msg.Text, err = b.getWeekSchedule(chatId, weakDay); err != nil {
+		if msg.Text, err = b.getScheduleByWeekDay(ctx, chatId, weakDay); err != nil {
 			msg.Text = formServerErr()
 		}
 
@@ -152,7 +153,7 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 
 		if searchText == "" {
 			msg.Text = "Вы забыли ввести фамилию"
-		} else if namesArr, getErr := getCommonTeacherNames(b.endpoints.Microservice, searchText); getErr != nil {
+		} else if namesArr, getErr := getCommonTeacherNames(ctx, b.endpoints.Microservice, searchText); getErr != nil {
 			err = getErr
 			msg.Text = formServerErr()
 		} else if len(namesArr) == 0 {
@@ -163,7 +164,7 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 		}
 
 	case message.Chat.UserName == "zipliZ" && message.Poll != nil:
-		users := b.repo.GetUsers()
+		users := b.repo.GetUserIds()
 		ticker := time.NewTicker(time.Second / 30)
 		for _, user := range users {
 			go func(user int64) {

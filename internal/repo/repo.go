@@ -17,30 +17,30 @@ type Repo interface {
 	GetHistory(chatId int64) []string
 	UpdateUserHistory(chatId int64, newGroup string)
 	UserExists(chatId int64) bool
-	GetUsers() []int64
+	GetUserIds() []int64
 	UpdateNotificationStatus(chatId int64, status bool)
 	GetTop3Donators() []Donator
 	IsDailyNotifierOn(chatId int64) bool
 	GetUserTimer(chatId int64) string
-	GetNotificationOn() []UsersToNotify
+	GetUsersToNotify() []UsersToNotify
 	UpdateUserTimer(chatId int64, timer string)
 }
 
-func New(cfg configs.DbConfig) *BotRepo {
+func New(cfg configs.DbConfig) (*BotRepo, error) {
 	database := reindexer.NewReindex("cproto://"+cfg.User+":"+cfg.Pass+"@"+cfg.Host+":"+cfg.Port+"/"+cfg.DbName, reindexer.WithCreateDBIfMissing())
 	if err := database.Ping(); err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 	err := database.OpenNamespace("users", reindexer.DefaultNamespaceOptions(), User{})
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 	err = database.OpenNamespace("donators", reindexer.DefaultNamespaceOptions(), Donator{})
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 
-	return &BotRepo{db: database}
+	return &BotRepo{db: database}, nil
 }
 
 func (b *BotRepo) CreateUser(chatId int64, username string) {
@@ -66,24 +66,28 @@ func (b *BotRepo) UpdateUserHolder(chatId int64, isStudent bool, newHolder strin
 	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Holder", newHolder).Set("IsStudent", isStudent).Update()
 }
 
-func (b *BotRepo) UpdateUserHistory(chatId int64, newGroup string) {
+func (b *BotRepo) UpdateUserHistory(chatId int64, newHolder string) {
 	result, found := b.db.Query("users").Where("ChatId", reindexer.EQ, chatId).Get()
 	if !found {
+		slog.Warn("updating user, user wasnt found by chatId", "chat_id", chatId)
 		return
 	}
 	oldHolder := result.(*User).Holder
 	historyArr := result.(*User).History
-	if newGroup == oldHolder {
+	if newHolder == oldHolder {
 		return
 	}
 	for i, holder := range historyArr {
-		if holder == newGroup {
+		if holder == newHolder {
 			historyArr = append(historyArr[:i], historyArr[i+1:]...)
 		}
 	}
 	historyArr = append([]string{oldHolder}, historyArr[:3]...)
 
-	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("History", historyArr).Update()
+	err := b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("History", historyArr).Update().Error()
+	if err != nil {
+		slog.Error("updating user history: ", err, "chat_id", chatId)
+	}
 }
 
 func (b *BotRepo) GetUserInfo(chatId int64) (bool, string) {
@@ -100,7 +104,7 @@ func (b *BotRepo) GetHistory(chatId int64) []string {
 	return nil
 }
 
-func (b *BotRepo) GetUsers() []int64 {
+func (b *BotRepo) GetUserIds() []int64 {
 	iterator := b.db.Query("users").Exec()
 	defer iterator.Close()
 	var users []int64
@@ -131,7 +135,7 @@ func (b *BotRepo) UpdateUserTimer(chatId int64, timer string) {
 	b.db.Query("users").Where("chatId", reindexer.EQ, chatId).Set("Timer", timer).Update()
 }
 
-func (b *BotRepo) GetNotificationOn() []UsersToNotify {
+func (b *BotRepo) GetUsersToNotify() []UsersToNotify {
 	iterator := b.db.Query("users").Where("DailyNotifier", reindexer.EQ, true).Exec()
 	defer iterator.Close()
 	var users []UsersToNotify

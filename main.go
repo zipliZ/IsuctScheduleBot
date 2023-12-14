@@ -6,16 +6,20 @@ import (
 	"ScheduleBot/internal/repo"
 	"ScheduleBot/internal/service"
 	"ScheduleBot/internal/store"
+	"log"
 	"log/slog"
 )
 
 func main() {
 	cfg := configs.DecodeConfig("./config.yaml")
 
-	botRepo := repo.New(cfg.Db)
+	botRepo, err := repo.New(cfg.Db)
+	if err != nil {
+		log.Panic(err)
+	}
 	notifierStore := store.New()
 	botService := service.Init(botRepo, *notifierStore)
-	scheduleBot := bot.Init(cfg.Bot.Token, botRepo, botService, notifierStore, cfg.Endpoints)
+	scheduleBot := bot.Init(cfg.BotToken, botRepo, botService, notifierStore, cfg.Endpoints)
 	slog.Info("Bot started")
 	scheduleBot.Listen()
 }

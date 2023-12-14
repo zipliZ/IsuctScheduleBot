@@ -5,6 +5,7 @@ import (
 	"ScheduleBot/internal/repo"
 	"ScheduleBot/internal/service"
 	"ScheduleBot/internal/store"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -16,6 +17,7 @@ type ScheduleBot struct {
 	store     *store.NotifierStore
 	buttons   buttons
 	endpoints configs.Endpoints
+	location  *time.Location
 }
 
 type buttons struct {
@@ -25,20 +27,28 @@ type buttons struct {
 }
 
 type GetScheduleResponse struct {
-	Week    int `json:"week"`
-	Weekday int `json:"weekday"`
-	Lessons []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
-		Time struct {
-			Start string `json:"start"`
-			End   string `json:"end"`
-		} `json:"time"`
-		Audience []struct {
-			Audience string `json:"audience"`
-		} `json:"audience"`
-		Teachers []struct {
-			Teacher string `json:"teacher"`
-		} `json:"teachers"`
-	} `json:"lessons"`
+	Week    int      `json:"week"`
+	Weekday int      `json:"weekday"`
+	Lessons []Lesson `json:"lessons"`
+}
+
+type Teacher struct {
+	Teacher string `json:"teacher"`
+}
+
+type Lesson struct {
+	Name     string     `json:"name"`
+	Type     string     `json:"type"`
+	Time     Time       `json:"time"`
+	Audience []Audience `json:"audience"`
+	Teachers []Teacher  `json:"teachers"`
+}
+
+type Time struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
+type Audience struct {
+	Audience string `json:"audience"`
 }

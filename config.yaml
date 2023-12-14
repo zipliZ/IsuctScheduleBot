@@ -5,9 +5,22 @@ db:
   port: "6534"
   dbName: "ScheduleDb"
 
-bot:
-  token: "6055714135:AAHJdRC6t6XWH1k-JI2ufXMlBHkL-9Q8L58"
+botToken: "6055714135:AAHJdRC6t6XWH1k-JI2ufXMlBHkL-9Q8L58"
 
 endpoints:
   microservice: "http://default"
   frontend: "http://isuct-schedule.ru"
+
+# Дев
+#db:
+#  user: "admin"
+#  pass: "F101Gc007"
+#  host: "localhost"
+#  port: "6534"
+#  dbName: "ScheduleDb"
+#
+#botToken: "6500428516:AAG7H8CWRn2HQ2ngVrbQa-TME_ea2vHFMIU"
+#
+#endpoints:
+#  microservice: "http://188.120.234.21:9818"
+#  frontend: "http://isuct-schedule.ru"

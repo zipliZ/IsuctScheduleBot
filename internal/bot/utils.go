@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func escapeSpecialChars(input string) string {
@@ -38,6 +40,7 @@ func getWeekdayName(weekday int) string {
 	return weekdays[weekday]
 }
 
+// Проверяет строку на день недели, если день недели число дня записывается в weekDay
 func checkWeekDay(message string, weakDay *int) bool {
 	switch message {
 	case "понедельник", "пн":
@@ -56,6 +59,13 @@ func checkWeekDay(message string, weakDay *int) bool {
 		return false
 	}
 	return true
+}
+
+func NewMessage(chatId int64, text string, silent bool) tgbotapi.MessageConfig {
+	msg := tgbotapi.NewMessage(chatId, text)
+	msg.ParseMode = "MarkdownV2"
+	msg.DisableNotification = silent
+	return msg
 }
 
 func formMessage(schedule GetScheduleResponse) string {
@@ -102,10 +112,10 @@ func formMessage(schedule GetScheduleResponse) string {
 	return dateString
 }
 
-func checkHolderExist(microUrl string, isStudent bool, holder string) (bool, error) {
-	holderType := "teacher"
+func checkHolderExistence(microUrl string, isStudent bool, holder string) (bool, error) {
+	holderType := holderTypeTeacher
 	if isStudent {
-		holderType = "group"
+		holderType = holderTypeGroup
 	}
 
 	url := fmt.Sprintf("%s/api/check/%s/%s", microUrl, holderType, holder)
@@ -120,12 +130,12 @@ func checkHolderExist(microUrl string, isStudent bool, holder string) (bool, err
 	return true, nil
 }
 
-func getCommonTeacherNames(microUrl, name string) ([]string, error) {
+func getCommonTeacherNames(ctx context.Context, microUrl, name string) ([]string, error) {
 	url := fmt.Sprintf("%s/api/associatedWith/%s", microUrl, name)
 
 	client := http.Client{Timeout: 5 * time.Second}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +157,7 @@ func getCommonTeacherNames(microUrl, name string) ([]string, error) {
 	return teachersNames, nil
 }
 
+// Функция возвращает является ли строка чилом, если оно число значение присваивается в digit
 func isDigit(message string, digit *int) bool {
 	var err error
 	*digit, err = strconv.Atoi(message)

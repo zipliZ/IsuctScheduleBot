@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -9,12 +10,12 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *ScheduleBot) handleCallback(callbackQuery *tgbotapi.CallbackQuery) (tgbotapi.MessageConfig, error) {
+func (b *ScheduleBot) handleCallback(ctx context.Context, callbackQuery *tgbotapi.CallbackQuery) (tgbotapi.MessageConfig, error) {
 	chatID := callbackQuery.Message.Chat.ID
 	callbackData := callbackQuery.Data
 
 	callback := tgbotapi.NewCallback(callbackQuery.ID, callbackQuery.Data)
-	msg := tgbotapi.NewMessage(chatID, "")
+	msg := NewMessage(chatID, "", false)
 
 	reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
 	reTeacher := regexp.MustCompile(`^[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.[А-ЯЁ]\.$`)
@@ -24,7 +25,7 @@ func (b *ScheduleBot) handleCallback(callbackQuery *tgbotapi.CallbackQuery) (tgb
 
 	switch {
 	case checkWeekDay(strings.ToLower(callbackData), &weakDay):
-		if msg.Text, err = b.getWeekSchedule(chatID, weakDay); err != nil {
+		if msg.Text, err = b.getScheduleByWeekDay(ctx, chatID, weakDay); err != nil {
 			msg.Text = formServerErr()
 		}
 

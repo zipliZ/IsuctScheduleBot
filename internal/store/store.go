@@ -3,10 +3,10 @@ package store
 import "sync"
 
 func New() *NotifierStore {
-	return &NotifierStore{data: make(map[string][]int64), mutex: &sync.RWMutex{}}
+	return &NotifierStore{data: make(map[TargetTime][]int64), mutex: &sync.RWMutex{}}
 }
 
-func (n *NotifierStore) Get(key string) ([]int64, bool) {
+func (n *NotifierStore) Get(key TargetTime) ([]int64, bool) {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
 
@@ -17,7 +17,7 @@ func (n *NotifierStore) Get(key string) ([]int64, bool) {
 	return value, true
 }
 
-func (n *NotifierStore) StoreUser(key string, user int64) {
+func (n *NotifierStore) AddUser(key TargetTime, user int64) {
 	users, exist := n.Get(key)
 
 	n.mutex.Lock()
@@ -29,7 +29,7 @@ func (n *NotifierStore) StoreUser(key string, user int64) {
 	n.data[key] = append(users, user)
 }
 
-func (n *NotifierStore) StoreDeleteUser(key string, user int64) {
+func (n *NotifierStore) DeleteUser(key TargetTime, user int64) {
 	users, exist := n.Get(key)
 	if !exist {
 		return
@@ -49,7 +49,7 @@ func (n *NotifierStore) StoreDeleteUser(key string, user int64) {
 	}
 }
 
-func (n *NotifierStore) StoreUpdateUser(oldKey, newKey string, user int64) {
-	n.StoreDeleteUser(oldKey, user)
-	n.StoreUser(newKey, user)
+func (n *NotifierStore) UpdateUser(oldKey, newKey TargetTime, user int64) {
+	n.DeleteUser(oldKey, user)
+	n.AddUser(newKey, user)
 }

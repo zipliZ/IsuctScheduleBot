@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	Db        DbConfig  `yaml:"db"`
-	Bot       BotConfig `yaml:"bot"`
+	BotToken  string    `yaml:"botToken"`
 	Endpoints Endpoints `yaml:"endpoints"`
 }
 

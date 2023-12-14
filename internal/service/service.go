@@ -23,17 +23,16 @@ func (s *BotService) ToggleNotification(chatId int64) string {
 		s.repo.UpdateNotificationStatus(chatId, false)
 		s.store.StoreDeleteUser(userTimer, chatId)
 		return "Получение ежедневного расписания выключено"
-	} else {
-		if userTimer == "" {
-			userTimer = "04:20"
-			s.repo.UpdateUserTimer(chatId, userTimer)
-			s.store.StoreUser(userTimer, chatId)
-		} else {
-			s.store.StoreUser(userTimer, chatId)
-		}
-		s.repo.UpdateNotificationStatus(chatId, true)
-		return fmt.Sprintf("Ежедневное расписание будет приходить в %s", userTimer)
 	}
+	if userTimer == "" {
+		userTimer = "04:20"
+		s.repo.UpdateUserTimer(chatId, userTimer)
+	}
+	s.store.StoreUser(userTimer, chatId)
+
+	s.repo.UpdateNotificationStatus(chatId, true)
+
+	return fmt.Sprintf("Ежедневное расписание будет приходить в %s", userTimer)
 }
 
 func (s *BotService) UpdateTimer(chatId int64, newTime string) string {

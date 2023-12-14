@@ -2,11 +2,12 @@ package bot
 
 import (
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log/slog"
 	"regexp"
 	"strings"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.MessageConfig, error) {
@@ -15,7 +16,7 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 	chatId := message.Chat.ID
 
 	reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
-	reTeacher := regexp.MustCompile("^[А-ЯЁ][а-яё]+\\s[А-ЯЁ]\\.[А-ЯЁ]\\.$")
+	reTeacher := regexp.MustCompile(`^[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.[А-ЯЁ]\.$`)
 	reDate := regexp.MustCompile(`^(0[1-9]|[12][0-9]|3[01]).(0[1-9]|1[0-2]).(\d{2}|\d{4})$`)
 
 	var weakDay int
@@ -76,11 +77,12 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 
 		reTime := regexp.MustCompile("^([0-1][0-9]|2[0-3]):([0-5][0-9])$")
 
-		if reqTime == "" {
+		switch {
+		case reqTime == "":
 			msg.Text = "*Вы забыли указать время* \n пример - таймер 04:20"
-		} else if reTime.MatchString(reqTime) {
+		case reTime.MatchString(reqTime):
 			msg.Text = b.service.UpdateTimer(chatId, reqTime)
-		} else {
+		default:
 			msg.Text = "*Время не соответствует формату* \n пример - таймер 04:19"
 		}
 
@@ -150,14 +152,11 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 
 		if searchText == "" {
 			msg.Text = "Вы забыли ввести фамилию"
-
 		} else if namesArr, getErr := getCommonTeacherNames(b.endpoints.Microservice, searchText); getErr != nil {
 			err = getErr
 			msg.Text = formServerErr()
-
 		} else if len(namesArr) == 0 {
 			msg.Text = "Такого преподавателя не существует"
-
 		} else {
 			msg.Text = "Выберите нужного вам преподавателя"
 			msg.ReplyMarkup = b.getTeacherButtons(namesArr)
@@ -167,15 +166,13 @@ func (b *ScheduleBot) handleMessage(message *tgbotapi.Message) (tgbotapi.Message
 		users := b.repo.GetUsers()
 		ticker := time.NewTicker(time.Second / 30)
 		for _, user := range users {
-			select {
-			case <-ticker.C:
-				go func(user int64) {
-					pollForward := tgbotapi.NewForward(user, chatId, message.MessageID)
-					if _, err := b.bot.Send(pollForward); err != nil {
-						slog.Error("sending pull", err, "chat_id:", msg.ChatID)
-					}
-				}(user)
-			}
+			go func(user int64) {
+				pollForward := tgbotapi.NewForward(user, chatId, message.MessageID)
+				if _, err := b.bot.Send(pollForward); err != nil {
+					slog.Error("sending pull", err, "chat_id:", msg.ChatID)
+				}
+			}(user)
+			<-ticker.C
 		}
 		msg.Text = "Голосование разосланно"
 

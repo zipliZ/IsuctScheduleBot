@@ -93,7 +93,6 @@ func (b *ScheduleBot) Listen() {
 				slog.Error("sending message :", err, "chat_id:", msg.ChatID)
 			}
 		}(update)
-
 	}
 }
 
@@ -161,7 +160,7 @@ func (b *ScheduleBot) getDaySchedule(chatID int64, offset int) (string, error) {
 	}
 
 	url := fmt.Sprintf("%s/api/%s/%s/day?offset=%d", b.endpoints.Microservice, holderType, holder, offset)
-	response, err := http.Get(url)
+	response, err := http.Get(url) //nolint:gosec
 	if err != nil {
 		return "", err
 	}
@@ -214,7 +213,7 @@ func (b *ScheduleBot) getScheduleOnDate(chatId int64, date string) (string, erro
 }
 
 func (b *ScheduleBot) getTeacherButtons(names []string) tgbotapi.InlineKeyboardMarkup {
-	var rows [][]tgbotapi.InlineKeyboardButton
+	rows := make([][]tgbotapi.InlineKeyboardButton, 0)
 	for _, name := range names {
 		url := fmt.Sprintf("%s/share/teacher/%s", b.endpoints.Frontend, name)
 		button := tgbotapi.NewInlineKeyboardButtonURL(name, url)

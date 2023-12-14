@@ -1,10 +1,12 @@
-FROM golang:1.20-alpine AS build-stage
+FROM golang:1.21-alpine AS build-stage
 
 WORKDIR /SheduleBot
 
 COPY . .
 
 RUN go mod download
+
+RUN go mod tidy
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app
 

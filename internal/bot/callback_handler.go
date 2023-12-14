@@ -2,10 +2,11 @@ package bot
 
 import (
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log/slog"
 	"regexp"
 	"strings"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (b *ScheduleBot) handleCallback(callbackQuery *tgbotapi.CallbackQuery) (tgbotapi.MessageConfig, error) {
@@ -16,7 +17,7 @@ func (b *ScheduleBot) handleCallback(callbackQuery *tgbotapi.CallbackQuery) (tgb
 	msg := tgbotapi.NewMessage(chatID, "")
 
 	reGroup := regexp.MustCompile(`^\d-\d{1,3}$`)
-	reTeacher := regexp.MustCompile("^[А-ЯЁ][а-яё]+\\s[А-ЯЁ]\\.[А-ЯЁ]\\.$")
+	reTeacher := regexp.MustCompile(`^[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.[А-ЯЁ]\.$`)
 
 	var err error
 	var weakDay int

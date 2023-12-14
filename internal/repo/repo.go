@@ -29,15 +29,15 @@ type Repo interface {
 func NewBotRepo(cfg configs.DbConfig) *BotRepo {
 	database := reindexer.NewReindex("cproto://"+cfg.User+":"+cfg.Pass+"@"+cfg.Host+":"+cfg.Port+"/"+cfg.DbName, reindexer.WithCreateDBIfMissing())
 	if err := database.Ping(); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	err := database.OpenNamespace("users", reindexer.DefaultNamespaceOptions(), User{})
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	err = database.OpenNamespace("donators", reindexer.DefaultNamespaceOptions(), Donator{})
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	return &BotRepo{db: database}
@@ -154,7 +154,7 @@ func (b *BotRepo) GetTop3Donators() []Donator {
 	if err != nil {
 		log.Println(err)
 	}
-	var donators []Donator
+	donators := make([]Donator, 0)
 	for _, item := range items {
 		donator := item.(*Donator)
 		donators = append(donators, *donator)

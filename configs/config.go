@@ -1,6 +1,7 @@
 package configs
 
 import (
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -32,12 +33,12 @@ type Endpoints struct {
 func DecodeConfig(path string) Config {
 	f, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	defer func(f *os.File) {
 		closeErr := f.Close()
 		if closeErr != nil {
-			panic(closeErr)
+			log.Panic(closeErr)
 		}
 	}(f)
 
@@ -45,7 +46,7 @@ func DecodeConfig(path string) Config {
 	decoder := yaml.NewDecoder(f)
 	err = decoder.Decode(&cfg)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return cfg
 }

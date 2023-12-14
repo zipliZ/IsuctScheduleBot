@@ -2,6 +2,7 @@ package bot
 
 import (
 	"ScheduleBot/internal/repo"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -113,7 +114,7 @@ func checkHolderExist(microUrl string, isStudent bool, holder string) (bool, err
 		log.Println(err)
 		return false, err
 	}
-	if response.StatusCode != 200 {
+	if response.StatusCode != http.StatusOK {
 		return false, nil
 	}
 	return true, nil
@@ -124,17 +125,18 @@ func getCommonTeacherNames(microUrl, name string) ([]string, error) {
 
 	client := http.Client{Timeout: 5 * time.Second}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := client.Do(req)
+	response, err := client.Do(req) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
-	if response.StatusCode != 200 {
+	if response.StatusCode != http.StatusOK {
 		return nil, nil
 	}
 
@@ -148,11 +150,8 @@ func getCommonTeacherNames(microUrl, name string) ([]string, error) {
 func isDigit(message string, digit *int) bool {
 	var err error
 	*digit, err = strconv.Atoi(message)
-	if err != nil {
-		return false
-	}
-	return true
 
+	return err == nil
 }
 
 func formHelpMessage() string {

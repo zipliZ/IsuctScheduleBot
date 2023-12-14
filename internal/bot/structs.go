@@ -5,6 +5,7 @@ import (
 	"ScheduleBot/internal/repo"
 	"ScheduleBot/internal/service"
 	"ScheduleBot/internal/store"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 

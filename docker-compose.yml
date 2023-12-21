@@ -1,0 +1,23 @@
+version: "3.4"
+
+services:
+  db:
+    image: reindexer/reindexer
+    restart: always
+    environment:
+      - RX_SECURITY=true
+    ports:
+      - "6534:6534"
+      - "9088:9088"
+    volumes:
+      - ./db:/db
+    container_name: ScheduleDb
+  isuctschedulebot:
+    depends_on:
+      - db
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    container_name: ScheduleBot
+
